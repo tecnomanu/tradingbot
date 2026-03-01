@@ -1,0 +1,514 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\BotStatus;
+use App\Enums\OrderSide;
+use App\Enums\OrderStatus;
+use App\Models\Bot;
+use App\Models\Order;
+use App\Repositories\BotRepository;
+use App\Repositories\OrderRepository;
+use Exception;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class GridTradingEngine
+{
+    public function __construct(
+        private BinanceFuturesService $binance,
+        private BotRepository $botRepository,
+        private OrderRepository $orderRepository,
+        private GridCalculatorService $gridCalculator,
+    ) {}
+
+    /**
+     * Initialize the bot on Binance: set leverage, margin type, and place initial grid orders.
+     *
+     * @throws Exception
+     */
+    public function initializeBot(Bot $bot): void
+    {
+        $account = $bot->binanceAccount;
+
+        if (!$account || !$account->is_active) {
+            throw new Exception('Binance account is not active');
+        }
+
+        Log::info('GridEngine: initializing bot', ['bot_id' => $bot->id, 'symbol' => $bot->symbol]);
+
+        $this->binance->setMarginType($account, $bot->symbol, 'CROSSED');
+        $this->binance->setLeverage($account, $bot->symbol, $bot->leverage);
+
+        $currentPrice = $this->binance->getCurrentPrice($account, $bot->symbol);
+
+        if (!$currentPrice) {
+            throw new Exception("Cannot get current price for {$bot->symbol}");
+        }
+
+        $this->placeInitialOrders($bot, $currentPrice);
+
+        $this->botRepository->update($bot, [
+            'status' => BotStatus::Active,
+            'started_at' => now(),
+        ]);
+
+        Log::info('GridEngine: bot initialized', ['bot_id' => $bot->id]);
+    }
+
+    /**
+     * Place initial grid limit orders around the current price.
+     * Buy orders below current price, sell orders above.
+     */
+    private function placeInitialOrders(Bot $bot, float $currentPrice): void
+    {
+        $account = $bot->binanceAccount;
+        $orders = $bot->orders()->where('status', OrderStatus::Open)->orderBy('price')->get();
+
+        if ($orders->isEmpty()) {
+            Log::warning('GridEngine: no grid orders found for bot', ['bot_id' => $bot->id]);
+            return;
+        }
+
+        $placedCount = 0;
+
+        foreach ($orders as $order) {
+            $isBuyOrder = $order->price < $currentPrice;
+            $expectedSide = $isBuyOrder ? OrderSide::Buy : OrderSide::Sell;
+            $binanceSide = $isBuyOrder ? 'BUY' : 'SELL';
+
+            if ($order->side !== $expectedSide) {
+                $order->update(['side' => $expectedSide]);
+            }
+
+            $quantity = $this->binance->formatQuantity($bot->symbol, $order->quantity);
+            $price = $this->binance->formatPrice($bot->symbol, $order->price);
+
+            if ($quantity <= 0) {
+                Log::warning('GridEngine: skipping order with zero quantity', [
+                    'order_id' => $order->id,
+                    'grid_level' => $order->grid_level,
+                ]);
+                continue;
+            }
+
+            try {
+                $clientOrderId = "grid_{$bot->id}_{$order->grid_level}";
+
+                $result = $this->binance->placeLimitOrder(
+                    $account,
+                    $bot->symbol,
+                    $binanceSide,
+                    $quantity,
+                    $price,
+                    $clientOrderId,
+                );
+
+                $order->update([
+                    'binance_order_id' => (string) $result['orderId'],
+                    'status' => OrderStatus::Open,
+                    'quantity' => $quantity,
+                    'price' => $price,
+                ]);
+
+                $placedCount++;
+            } catch (Exception $e) {
+                Log::error('GridEngine: failed to place order', [
+                    'bot_id' => $bot->id,
+                    'grid_level' => $order->grid_level,
+                    'price' => $price,
+                    'side' => $binanceSide,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('GridEngine: placed initial orders', [
+            'bot_id' => $bot->id,
+            'placed' => $placedCount,
+            'total' => $orders->count(),
+        ]);
+    }
+
+    /**
+     * Process an active bot: sync order statuses from Binance, handle fills, rotate grid.
+     * Also checks stop-loss and take-profit conditions.
+     */
+    public function processBot(Bot $bot): void
+    {
+        if ($bot->status !== BotStatus::Active) {
+            return;
+        }
+
+        $account = $bot->binanceAccount;
+
+        if (!$account) {
+            $this->botRepository->update($bot, ['status' => BotStatus::Error]);
+            return;
+        }
+
+        try {
+            $this->syncOrderStatuses($bot);
+            $this->handleFilledOrders($bot);
+            $this->updateBotStats($bot);
+            $this->checkStopConditions($bot);
+        } catch (Exception $e) {
+            Log::error('GridEngine: error processing bot', [
+                'bot_id' => $bot->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->botRepository->update($bot, [
+                'status' => BotStatus::Error,
+            ]);
+        }
+    }
+
+    /**
+     * Check stop-loss and take-profit price conditions.
+     * If current price crosses SL or TP, stop the bot and close position.
+     */
+    private function checkStopConditions(Bot $bot): void
+    {
+        if (!$bot->stop_loss_price && !$bot->take_profit_price) {
+            return;
+        }
+
+        $account = $bot->binanceAccount;
+        $currentPrice = $this->binance->getCurrentPrice($account, $bot->symbol);
+
+        if (!$currentPrice) {
+            return;
+        }
+
+        $triggered = null;
+
+        if ($bot->stop_loss_price && $currentPrice <= (float) $bot->stop_loss_price) {
+            $triggered = 'stop_loss';
+        } elseif ($bot->take_profit_price && $currentPrice >= (float) $bot->take_profit_price) {
+            $triggered = 'take_profit';
+        }
+
+        if ($triggered) {
+            Log::warning("GridEngine: {$triggered} triggered", [
+                'bot_id' => $bot->id,
+                'current_price' => $currentPrice,
+                'sl' => $bot->stop_loss_price,
+                'tp' => $bot->take_profit_price,
+            ]);
+
+            $this->stopBot($bot);
+
+            $positions = $this->binance->getPositions($account, $bot->symbol);
+            foreach ($positions as $pos) {
+                if (abs($pos['positionAmt']) > 0) {
+                    $this->closePosition($account, $bot->symbol, $pos['positionAmt']);
+                }
+            }
+        }
+    }
+
+    /**
+     * Close a position with a market order.
+     */
+    private function closePosition($account, string $symbol, float $positionAmt): void
+    {
+        try {
+            $side = $positionAmt > 0 ? 'SELL' : 'BUY';
+            $qty = abs($positionAmt);
+            $formattedQty = $this->binance->formatQuantity($symbol, $qty);
+
+            $client = $this->binance->createClient($account);
+            $request = new \Binance\Client\DerivativesTradingUsdsFutures\Model\NewOrderRequest([
+                'symbol' => $symbol,
+                'side' => $side === 'BUY'
+                    ? \Binance\Client\DerivativesTradingUsdsFutures\Model\Side::BUY
+                    : \Binance\Client\DerivativesTradingUsdsFutures\Model\Side::SELL,
+                'type' => 'MARKET',
+                'quantity' => $formattedQty,
+                'reduceOnly' => true,
+            ]);
+            $client->newOrder($request);
+
+            Log::info('GridEngine: position closed', [
+                'symbol' => $symbol,
+                'qty' => $formattedQty,
+                'side' => $side,
+            ]);
+        } catch (Exception $e) {
+            Log::error('GridEngine: failed to close position', [
+                'symbol' => $symbol,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sync local order statuses with Binance.
+     * Compares local open orders against Binance's open order list.
+     * Orders missing from Binance open list are individually queried.
+     */
+    private function syncOrderStatuses(Bot $bot): void
+    {
+        $account = $bot->binanceAccount;
+
+        $openOrders = $bot->orders()
+            ->where('status', OrderStatus::Open)
+            ->whereNotNull('binance_order_id')
+            ->get();
+
+        if ($openOrders->isEmpty()) {
+            return;
+        }
+
+        $binanceOpenIds = collect($this->binance->getOpenOrders($account, $bot->symbol))
+            ->pluck('orderId')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+
+        foreach ($openOrders as $order) {
+            if (in_array($order->binance_order_id, $binanceOpenIds, true)) {
+                continue;
+            }
+
+            $orderInfo = $this->binance->queryOrder(
+                $account,
+                $bot->symbol,
+                (int) $order->binance_order_id,
+            );
+
+            if (!$orderInfo) {
+                continue;
+            }
+
+            $status = strtoupper($orderInfo['status']);
+
+            if ($status === 'FILLED') {
+                $filledQty = (float) ($orderInfo['executedQty'] ?? $order->quantity);
+                $avgPrice = (float) ($orderInfo['avgPrice'] ?? $order->price);
+
+                $order->update([
+                    'status' => OrderStatus::Filled,
+                    'filled_at' => now(),
+                    'quantity' => $filledQty,
+                    'price' => $avgPrice ?: $order->price,
+                ]);
+
+                Log::info('GridEngine: order filled', [
+                    'bot_id' => $bot->id,
+                    'order_id' => $order->id,
+                    'side' => $order->side->value,
+                    'level' => $order->grid_level,
+                    'qty' => $filledQty,
+                    'price' => $avgPrice,
+                ]);
+            } elseif (in_array($status, ['CANCELED', 'CANCELLED', 'EXPIRED'])) {
+                $order->update(['status' => OrderStatus::Cancelled]);
+            } elseif ($status === 'PARTIALLY_FILLED') {
+                $order->update(['status' => OrderStatus::PartiallyFilled]);
+            }
+        }
+    }
+
+    /**
+     * Handle filled orders: calculate PNL and place counter-orders to continue the grid.
+     *
+     * Grid logic:
+     * - When a BUY order fills → place a SELL order one grid level up
+     * - When a SELL order fills → place a BUY order one grid level down
+     * - Never duplicate: skip if there's already an open order at the target level+side
+     */
+    private function handleFilledOrders(Bot $bot): void
+    {
+        $filledOrders = $bot->orders()
+            ->where('status', OrderStatus::Filled)
+            ->whereNull('pnl')
+            ->get();
+
+        if ($filledOrders->isEmpty()) {
+            return;
+        }
+
+        $account = $bot->binanceAccount;
+        $gridConfig = $this->gridCalculator->calculateFullGridConfig([
+            'price_lower' => $bot->price_lower,
+            'price_upper' => $bot->price_upper,
+            'grid_count' => $bot->grid_count,
+            'investment' => $bot->investment,
+            'leverage' => $bot->leverage,
+            'side' => $bot->side->value,
+        ]);
+
+        $gridLevels = $gridConfig['grid_levels'];
+        $quantityPerGrid = $this->binance->formatQuantity(
+            $bot->symbol,
+            $gridConfig['quantity_per_grid'],
+        );
+        $gridStep = ($bot->price_upper - $bot->price_lower) / $bot->grid_count;
+
+        foreach ($filledOrders as $order) {
+            $pnl = 0;
+            $counterSide = null;
+            $counterLevel = null;
+
+            if ($order->side === OrderSide::Buy) {
+                $counterLevel = $order->grid_level + 1;
+                $counterSide = OrderSide::Sell;
+                $pnl = 0;
+            } elseif ($order->side === OrderSide::Sell) {
+                $counterLevel = $order->grid_level - 1;
+                $counterSide = OrderSide::Buy;
+
+                $realQty = $order->quantity ?: $quantityPerGrid;
+                $commission = $order->price * $realQty * 0.0004 * 2;
+                $pnl = round($gridStep * $realQty - $commission, 4);
+            }
+
+            $order->update(['pnl' => $pnl]);
+
+            if ($counterLevel === null || !isset($gridLevels[$counterLevel])) {
+                Log::info('GridEngine: no counter level available', [
+                    'bot_id' => $bot->id,
+                    'filled_level' => $order->grid_level,
+                    'counter_level' => $counterLevel,
+                ]);
+                continue;
+            }
+
+            $existingOpen = $bot->orders()
+                ->where('grid_level', $counterLevel)
+                ->where('side', $counterSide)
+                ->where('status', OrderStatus::Open)
+                ->exists();
+
+            if ($existingOpen) {
+                Log::info('GridEngine: counter-order skipped (already exists)', [
+                    'bot_id' => $bot->id,
+                    'counter_level' => $counterLevel,
+                    'side' => $counterSide->value,
+                ]);
+                continue;
+            }
+
+            $counterPrice = $gridLevels[$counterLevel];
+            $this->placeCounterOrder($bot, $account, $counterSide, $counterLevel, $counterPrice, $quantityPerGrid);
+        }
+    }
+
+    /**
+     * Place a counter-order on the opposite side of a filled grid order.
+     */
+    private function placeCounterOrder(
+        Bot $bot,
+        $account,
+        OrderSide $side,
+        int $gridLevel,
+        float $price,
+        float $quantity,
+    ): void {
+        $binanceSide = $side === OrderSide::Buy ? 'BUY' : 'SELL';
+        $formattedQty = $this->binance->formatQuantity($bot->symbol, $quantity);
+        $formattedPrice = $this->binance->formatPrice($bot->symbol, $price);
+
+        if ($formattedQty <= 0) {
+            return;
+        }
+
+        try {
+            $clientOrderId = "grid_{$bot->id}_{$gridLevel}_" . time();
+
+            $result = $this->binance->placeLimitOrder(
+                $account,
+                $bot->symbol,
+                $binanceSide,
+                $formattedQty,
+                $formattedPrice,
+                $clientOrderId,
+            );
+
+            Order::create([
+                'bot_id' => $bot->id,
+                'side' => $side,
+                'status' => OrderStatus::Open,
+                'price' => $formattedPrice,
+                'quantity' => $formattedQty,
+                'grid_level' => $gridLevel,
+                'binance_order_id' => (string) $result['orderId'],
+            ]);
+
+            Log::info('GridEngine: counter-order placed', [
+                'bot_id' => $bot->id,
+                'side' => $binanceSide,
+                'grid_level' => $gridLevel,
+                'price' => $formattedPrice,
+            ]);
+        } catch (Exception $e) {
+            Log::error('GridEngine: failed to place counter-order', [
+                'bot_id' => $bot->id,
+                'grid_level' => $gridLevel,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Update bot aggregate stats: total PNL, grid profit, rounds.
+     */
+    private function updateBotStats(Bot $bot): void
+    {
+        $filledOrders = $bot->orders()->where('status', OrderStatus::Filled)->get();
+
+        $totalPnl = $filledOrders->sum('pnl');
+        $sellFills = $filledOrders->where('side', OrderSide::Sell)->count();
+        $buyFills = $filledOrders->where('side', OrderSide::Buy)->count();
+        $rounds = min($sellFills, $buyFills);
+
+        $account = $bot->binanceAccount;
+        $trendPnl = 0;
+
+        if ($account) {
+            $positions = $this->binance->getPositions($account, $bot->symbol);
+            foreach ($positions as $pos) {
+                $trendPnl += $pos['unrealizedProfit'];
+            }
+        }
+
+        $rounds24h = $bot->orders()
+            ->where('status', OrderStatus::Filled)
+            ->where('side', OrderSide::Sell)
+            ->where('filled_at', '>=', now()->subDay())
+            ->count();
+
+        $this->botRepository->update($bot, [
+            'total_pnl' => round($totalPnl + $trendPnl, 4),
+            'grid_profit' => round($totalPnl, 4),
+            'trend_pnl' => round($trendPnl, 4),
+            'total_rounds' => $rounds,
+            'rounds_24h' => $rounds24h,
+        ]);
+    }
+
+    /**
+     * Gracefully stop a bot: cancel all open orders on Binance.
+     */
+    public function stopBot(Bot $bot): void
+    {
+        $account = $bot->binanceAccount;
+
+        if ($account) {
+            $this->binance->cancelAllOrders($account, $bot->symbol);
+        }
+
+        // Mark all open local orders as cancelled
+        $bot->orders()
+            ->where('status', OrderStatus::Open)
+            ->update(['status' => OrderStatus::Cancelled->value]);
+
+        $this->botRepository->update($bot, [
+            'status' => BotStatus::Stopped,
+            'stopped_at' => now(),
+        ]);
+
+        Log::info('GridEngine: bot stopped', ['bot_id' => $bot->id]);
+    }
+}
