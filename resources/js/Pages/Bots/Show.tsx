@@ -371,6 +371,7 @@ export default function Show({
                                                 <th className="pb-1.5 text-left font-medium">Precio</th>
                                                 <th className="pb-1.5 text-left font-medium">Lado</th>
                                                 <th className="pb-1.5 text-right font-medium">Cantidad</th>
+                                                <th className="pb-1.5 text-right font-medium">Creada</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
@@ -390,11 +391,14 @@ export default function Show({
                                                         <td className="py-1.5 text-right tabular-nums">
                                                             {o.quantity.toFixed(5)}
                                                         </td>
+                                                        <td className="py-1.5 text-right text-muted-foreground">
+                                                            {o.created_at_fmt ?? "—"}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             {chartOrders.filter(o => o.status === "open").length === 0 && (
                                                 <tr>
-                                                    <td colSpan={3} className="py-4 text-center text-muted-foreground">
+                                                    <td colSpan={4} className="py-4 text-center text-muted-foreground">
                                                         Sin órdenes pendientes
                                                     </td>
                                                 </tr>
@@ -423,6 +427,7 @@ export default function Show({
                                                 <th className="pb-1.5 text-left font-medium">Precio</th>
                                                 <th className="pb-1.5 text-left font-medium">Lado</th>
                                                 <th className="pb-1.5 text-right font-medium">Cantidad</th>
+                                                <th className="pb-1.5 text-right font-medium">Ejecutada</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
@@ -443,11 +448,14 @@ export default function Show({
                                                         <td className="py-1.5 text-right tabular-nums">
                                                             {o.quantity.toFixed(5)}
                                                         </td>
+                                                        <td className="py-1.5 text-right text-muted-foreground">
+                                                            {o.filled_at_fmt ?? "—"}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             {chartOrders.filter(o => o.status === "filled").length === 0 && (
                                                 <tr>
-                                                    <td colSpan={3} className="py-4 text-center text-muted-foreground">
+                                                    <td colSpan={4} className="py-4 text-center text-muted-foreground">
                                                         Sin ejecuciones aún
                                                     </td>
                                                 </tr>

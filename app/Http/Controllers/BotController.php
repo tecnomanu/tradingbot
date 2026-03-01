@@ -292,6 +292,8 @@ class BotController extends Controller
                 'price' => (float) $o->price,
                 'quantity' => (float) $o->quantity,
                 'time' => ($o->filled_at ?? $o->created_at)?->timestamp,
+                'created_at_fmt' => $o->created_at?->format('d/m H:i'),
+                'filled_at_fmt' => $o->filled_at?->format('d/m H:i'),
             ])
             ->values();
 

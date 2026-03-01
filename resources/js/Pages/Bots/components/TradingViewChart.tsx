@@ -17,6 +17,8 @@ export interface ChartOrder {
     price: number;
     quantity: number;
     time: number;
+    created_at_fmt?: string;
+    filled_at_fmt?: string;
 }
 
 interface TradingViewChartProps {

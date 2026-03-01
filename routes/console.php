@@ -22,6 +22,6 @@ Schedule::job(new RunAiAnalysisJob)
     ->name('run-ai-analysis');
 
 Schedule::job(new RunAgentConsultationJob)
-    ->hourly()
+    ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->name('run-agent-consultation');

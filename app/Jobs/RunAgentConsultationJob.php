@@ -11,7 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 {
@@ -19,7 +19,7 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 
     public int $tries = 1;
     public int $timeout = 300; // 5 min max
-    public int $uniqueFor = 3600; // 1 hour uniqueness
+    public int $uniqueFor = 900; // 15 min uniqueness
 
     public function uniqueId(): string
     {

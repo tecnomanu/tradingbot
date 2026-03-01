@@ -6,7 +6,7 @@ use App\Models\AiConversation;
 use App\Models\AiConversationMessage;
 use App\Models\Bot;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class AgentOrchestrator
 {
@@ -21,9 +21,9 @@ class AgentOrchestrator
     public function __construct(
         private AgentToolkit $toolkit,
     ) {
-        $this->apiUrl = config('services.ai.url');
-        $this->model = config('services.ai.model');
-        $this->apiKey = config('services.ai.key');
+        $this->apiUrl = config('services.ai.url') ?: 'https://api.groq.com/openai/v1/chat/completions';
+        $this->model = config('services.ai.model') ?: 'qwen/qwen3-32b';
+        $this->apiKey = config('services.ai.key') ?: '';
     }
 
     public function consult(Bot $bot, string $trigger = 'scheduled'): AiConversation
@@ -183,6 +183,7 @@ PROMPT;
                     $toolMessage = [
                         'role' => 'tool',
                         'tool_call_id' => $result['tool_call_id'],
+                        'name' => $result['tool_name'],
                         'content' => json_encode($result['result']),
                     ];
                     $messages[] = $toolMessage;
@@ -305,6 +306,10 @@ PROMPT;
 
             if (isset($msg['tool_call_id'])) {
                 $apiMsg['tool_call_id'] = $msg['tool_call_id'];
+            }
+
+            if (isset($msg['name'])) {
+                $apiMsg['name'] = $msg['name'];
             }
 
             $apiMessages[] = $apiMsg;

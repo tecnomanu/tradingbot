@@ -15,7 +15,6 @@ import { Head, Link, router, usePage } from "@inertiajs/react";
 import {
     Activity,
     ArrowRight,
-    Bot,
     Brain,
     Clock,
     MessageSquare,
@@ -85,6 +84,19 @@ interface Props {
         total_quick_analyses: number;
     };
     userBots: UserBot[];
+}
+
+function timeAgo(date: Date): string {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return "hace unos segundos";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60)
+        return `hace ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24)
+        return `hace ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `hace ${days}d`;
 }
 
 const actionLabels: Record<string, string> = {
@@ -291,94 +303,148 @@ export default function AiAgentIndex({
                                         <Brain className="h-12 w-12 text-muted-foreground/30" />
                                         <p className="text-muted-foreground">
                                             Sin consultas todavía. El agente
-                                            consulta automáticamente cada hora.
+                                            consulta automáticamente cada 15
+                                            min.
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-border">
-                                        {conversations.data.map((conv) => (
-                                            <Link
-                                                key={conv.id}
-                                                href={`/ai-agent/conversations/${conv.id}`}
-                                                className="flex items-center justify-between gap-4 p-4 transition-colors hover:bg-muted/20"
-                                            >
-                                                <div className="flex-1 space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Bot className="h-4 w-4 text-primary" />
-                                                        <span className="font-medium">
-                                                            {conv.bot?.symbol ||
-                                                                "?"}
-                                                        </span>
-                                                        <Badge
-                                                            variant={
-                                                                conv.status ===
-                                                                "completed"
-                                                                    ? "default"
-                                                                    : conv.status ===
-                                                                        "running"
-                                                                      ? "secondary"
-                                                                      : "destructive"
-                                                            }
-                                                            className="text-xs"
-                                                        >
-                                                            {conv.status}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs"
-                                                        >
-                                                            {conv.trigger}
-                                                        </Badge>
-                                                    </div>
-                                                    {conv.summary && (
-                                                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                                                            {conv.summary}
-                                                        </p>
-                                                    )}
-                                                    <div className="flex gap-3 text-xs text-muted-foreground">
-                                                        <span>
-                                                            {
-                                                                conv.total_tool_calls
-                                                            }{" "}
-                                                            tools
-                                                        </span>
-                                                        <span>
-                                                            {conv.total_tokens}{" "}
-                                                            tokens
-                                                        </span>
-                                                        {conv.duration_ms && (
-                                                            <span>
-                                                                {(
-                                                                    conv.duration_ms /
-                                                                    1000
-                                                                ).toFixed(1)}
-                                                                s
+                                        {conversations.data.map(
+                                            (conv, idx) => {
+                                                const seqNum =
+                                                    conversations.data.length -
+                                                    idx;
+                                                const d = new Date(
+                                                    conv.created_at,
+                                                );
+                                                const ago = timeAgo(d);
+                                                const hasActions =
+                                                    conv.actions_taken &&
+                                                    conv.actions_taken.length >
+                                                        0;
+                                                return (
+                                                    <Link
+                                                        key={conv.id}
+                                                        href={`/ai-agent/conversations/${conv.id}`}
+                                                        className="flex items-start gap-4 p-4 transition-colors hover:bg-muted/20"
+                                                    >
+                                                        <div className="flex flex-col items-center gap-1 pt-0.5">
+                                                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                                                {seqNum}
                                                             </span>
-                                                        )}
-                                                        {conv.actions_taken &&
-                                                            conv.actions_taken
-                                                                .length > 0 && (
-                                                                <span className="text-primary">
-                                                                    {
-                                                                        conv
-                                                                            .actions_taken
-                                                                            .length
-                                                                    }{" "}
-                                                                    acciones
-                                                                </span>
+                                                            {hasActions && (
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
                                                             )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                    <span>
-                                                        {new Date(
-                                                            conv.created_at,
-                                                        ).toLocaleString()}
-                                                    </span>
-                                                    <ArrowRight className="h-4 w-4" />
-                                                </div>
-                                            </Link>
-                                        ))}
+                                                        </div>
+                                                        <div className="flex-1 space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">
+                                                                    {conv.bot
+                                                                        ?.symbol ||
+                                                                        "?"}
+                                                                </span>
+                                                                <Badge
+                                                                    variant={
+                                                                        conv.status ===
+                                                                        "completed"
+                                                                            ? "default"
+                                                                            : conv.status ===
+                                                                                "running"
+                                                                              ? "secondary"
+                                                                              : "destructive"
+                                                                    }
+                                                                    className="text-[10px]"
+                                                                >
+                                                                    {
+                                                                        conv.status
+                                                                    }
+                                                                </Badge>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="text-[10px]"
+                                                                >
+                                                                    {
+                                                                        conv.trigger
+                                                                    }
+                                                                </Badge>
+                                                                {conv.model && (
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        ·{" "}
+                                                                        {
+                                                                            conv.model
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {conv.summary && (
+                                                                <p className="line-clamp-2 text-sm text-muted-foreground">
+                                                                    {
+                                                                        conv.summary
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                                                <span>
+                                                                    {
+                                                                        conv.total_tool_calls
+                                                                    }{" "}
+                                                                    tools
+                                                                </span>
+                                                                <span>
+                                                                    {
+                                                                        conv.total_tokens
+                                                                    }{" "}
+                                                                    tokens
+                                                                </span>
+                                                                {conv.duration_ms && (
+                                                                    <span>
+                                                                        {(
+                                                                            conv.duration_ms /
+                                                                            1000
+                                                                        ).toFixed(
+                                                                            1,
+                                                                        )}
+                                                                        s
+                                                                    </span>
+                                                                )}
+                                                                {hasActions && (
+                                                                    <span className="text-yellow-400">
+                                                                        {
+                                                                            conv
+                                                                                .actions_taken!
+                                                                                .length
+                                                                        }{" "}
+                                                                        acciones
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground whitespace-nowrap pt-0.5">
+                                                            <span>
+                                                                {d.toLocaleDateString(
+                                                                    "es",
+                                                                    {
+                                                                        day: "2-digit",
+                                                                        month: "2-digit",
+                                                                    },
+                                                                )}{" "}
+                                                                {d.toLocaleTimeString(
+                                                                    "es",
+                                                                    {
+                                                                        hour: "2-digit",
+                                                                        minute: "2-digit",
+                                                                    },
+                                                                )}
+                                                            </span>
+                                                            <span className="text-[10px]">
+                                                                {ago}
+                                                            </span>
+                                                            <ArrowRight className="mt-1 h-3.5 w-3.5" />
+                                                        </div>
+                                                    </Link>
+                                                );
+                                            },
+                                        )}
                                     </div>
                                 )}
                             </CardContent>

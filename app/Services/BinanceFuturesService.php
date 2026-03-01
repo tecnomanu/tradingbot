@@ -12,7 +12,7 @@ use Binance\Client\DerivativesTradingUsdsFutures\Model\NewOrderRequest;
 use Binance\Client\DerivativesTradingUsdsFutures\Model\Side;
 use Binance\Common\ApiException;
 use Exception;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class BinanceFuturesService
 {

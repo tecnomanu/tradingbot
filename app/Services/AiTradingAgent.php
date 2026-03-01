@@ -6,7 +6,7 @@ use App\Constants\BinanceConstants;
 use App\Models\AiAgentLog;
 use App\Models\Bot;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class AiTradingAgent
 {
@@ -16,9 +16,9 @@ class AiTradingAgent
 
     public function __construct()
     {
-        $this->apiUrl = config('services.ai.url');
-        $this->model = config('services.ai.model');
-        $this->apiKey = config('services.ai.key');
+        $this->apiUrl = config('services.ai.url') ?: 'https://api.groq.com/openai/v1/chat/completions';
+        $this->model = config('services.ai.model') ?: 'qwen/qwen3-32b';
+        $this->apiKey = config('services.ai.key') ?: '';
     }
 
     public function analyzeBot(Bot $bot): ?AiAgentLog

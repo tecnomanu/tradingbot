@@ -8,7 +8,7 @@ use App\Services\AiTradingAgent;
 use App\Services\BinanceApiService;
 use App\Services\BinanceFuturesService;
 use App\Services\GridTradingEngine;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class AgentToolkit
 {

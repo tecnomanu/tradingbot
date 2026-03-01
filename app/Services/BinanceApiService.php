@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Constants\BinanceConstants;
 use App\Models\BinanceAccount;
 use Exception;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class BinanceApiService
 {

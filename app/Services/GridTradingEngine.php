@@ -11,7 +11,7 @@ use App\Repositories\BotRepository;
 use App\Repositories\OrderRepository;
 use Exception;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Support\BotLog as Log;
 
 class GridTradingEngine
 {
