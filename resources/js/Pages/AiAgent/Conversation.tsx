@@ -46,6 +46,7 @@ interface ConversationData {
     trigger: string;
     model: string | null;
     summary: string | null;
+    analysis: string | null;
     total_tokens: number;
     total_tool_calls: number;
     total_messages: number;
@@ -204,19 +205,16 @@ function TimelineStep({
                                 )}
                             </div>
 
-                            {result && (
+                            {result && !isDone && (
                                 <div className="mt-2">
-                                    {isDone && result.summary ? (
-                                        <p className="text-sm text-foreground">
-                                            {result.summary}
-                                        </p>
-                                    ) : (
-                                        <CollapsibleJson
-                                            data={result}
-                                            label="Resultado"
-                                        />
-                                    )}
+                                    <CollapsibleJson
+                                        data={result}
+                                        label="Resultado"
+                                    />
                                 </div>
+                            )}
+                            {isDone && args.analysis && (
+                                <p className="mt-2 text-sm text-foreground">{args.analysis}</p>
                             )}
                         </div>
                     );
@@ -300,17 +298,24 @@ export default function ConversationView({
                     </div>
                 </div>
 
-                {/* Summary Card */}
-                {conversation.summary && (
+                {/* Analysis & Summary Card */}
+                {(conversation.analysis || conversation.summary) && (
                     <Card className="border-primary/20 bg-primary/5">
-                        <CardContent className="p-4">
-                            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-primary">
+                        <CardContent className="p-4 space-y-2">
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
                                 <Brain className="h-3.5 w-3.5" />
-                                Conclusión del Agente
+                                Análisis del Agente
                             </div>
-                            <p className="text-sm leading-relaxed text-foreground">
-                                {conversation.summary}
-                            </p>
+                            {conversation.analysis && (
+                                <p className="text-sm leading-relaxed text-foreground">
+                                    {conversation.analysis}
+                                </p>
+                            )}
+                            {conversation.summary && (
+                                <p className="text-xs text-muted-foreground italic">
+                                    {conversation.summary}
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 )}

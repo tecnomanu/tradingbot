@@ -25,6 +25,8 @@ class Bot extends Model
         'slippage',
         'stop_loss_price',
         'take_profit_price',
+        'ai_system_prompt',
+        'ai_user_prompt',
         'real_investment',
         'additional_margin',
         'est_liquidation_price',

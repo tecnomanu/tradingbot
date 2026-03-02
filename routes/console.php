@@ -17,7 +17,7 @@ Schedule::job(new TakePnlSnapshotJob)
     ->name('take-pnl-snapshots');
 
 Schedule::job(new RunAiAnalysisJob)
-    ->everyFiveMinutes()
+    ->everyTenMinutes()
     ->withoutOverlapping()
     ->name('run-ai-analysis');
 

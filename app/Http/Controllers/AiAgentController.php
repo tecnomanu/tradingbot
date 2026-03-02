@@ -8,7 +8,9 @@ use App\Models\Bot;
 use App\Models\BotActionLog;
 use App\Services\Agent\AgentOrchestrator;
 use App\Services\AiTradingAgent;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 
 class AiAgentController extends Controller
@@ -33,7 +35,7 @@ class AiAgentController extends Controller
                 $q->whereIn('bot_id', $botIds)->orWhereNull('bot_id');
             })
             ->orderByDesc('created_at')
-            ->limit(20)
+            ->limit(30)
             ->get();
 
         $stats = [
@@ -112,5 +114,85 @@ class AiAgentController extends Controller
         }
 
         return back()->with('error', 'No se pudo completar el análisis.');
+    }
+
+    public function updateBotPrompts(Request $request, Bot $bot)
+    {
+        abort_unless($bot->user_id === $request->user()->id, 403);
+
+        $data = $request->validate([
+            'ai_system_prompt' => 'nullable|string|max:5000',
+            'ai_user_prompt' => 'nullable|string|max:2000',
+        ]);
+
+        $bot->update([
+            'ai_system_prompt' => $data['ai_system_prompt'] ?: null,
+            'ai_user_prompt' => $data['ai_user_prompt'] ?: null,
+        ]);
+
+        return back()->with('success', 'Prompts AI actualizados.');
+    }
+
+    public function testBotPrompts(Request $request, Bot $bot): JsonResponse
+    {
+        abort_unless($bot->user_id === $request->user()->id, 403);
+
+        $data = $request->validate([
+            'ai_system_prompt' => 'nullable|string|max:5000',
+            'ai_user_prompt' => 'nullable|string|max:2000',
+        ]);
+
+        $systemPrompt = $data['ai_system_prompt'] ?: AgentOrchestrator::defaultSystemPrompt();
+        $userPrompt = $data['ai_user_prompt'] ?: AgentOrchestrator::defaultUserPrompt();
+
+        $reviewPrompt = <<<REVIEW
+You are an expert AI prompt engineer reviewing a trading bot agent configuration.
+
+Analyze the following system prompt and first message that will be used by an LLM agent managing a grid trading bot. The agent has tools: get_bot_status, get_market_data, get_open_orders, get_filled_orders, get_binance_position, set_stop_loss, set_take_profit, cancel_all_orders, stop_bot, close_position, done.
+
+--- SYSTEM PROMPT ---
+{$systemPrompt}
+
+--- FIRST MESSAGE (template, {bot_id}/{symbol}/{now} are replaced at runtime) ---
+{$userPrompt}
+
+--- BOT CONTEXT ---
+Bot #{$bot->id} | Symbol: {$bot->symbol} | Side: {$bot->side} | Leverage: {$bot->leverage}x | Grid: {$bot->price_lower}-{$bot->price_upper} ({$bot->grid_count} levels)
+
+Respond in Spanish. Provide a brief assessment (max 200 words):
+1. **Alcance**: What this config covers and what it misses
+2. **Fortalezas**: What's good
+3. **Debilidades**: Potential issues or gaps
+4. **Mejoras**: Concrete suggestions to improve
+REVIEW;
+
+        try {
+            $apiUrl = config('services.ai.url') ?: 'https://api.groq.com/openai/v1/chat/completions';
+            $apiKey = config('services.ai.key');
+            $model = config('services.ai.model') ?: 'qwen/qwen3-32b';
+
+            $response = Http::withHeaders([
+                'Authorization' => "Bearer {$apiKey}",
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post($apiUrl, [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'user', 'content' => $reviewPrompt],
+                ],
+                'temperature' => 0.3,
+                'max_tokens' => 500,
+            ]);
+
+            if (!$response->successful()) {
+                return response()->json(['error' => 'API error: ' . $response->status()], 500);
+            }
+
+            $content = $response->json('choices.0.message.content') ?? '';
+            $content = trim(preg_replace('/<think>.*?(<\/think>|$)/s', '', $content));
+
+            return response()->json(['review' => $content]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

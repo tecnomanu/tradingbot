@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class AiConversation extends Model
 {
     protected $fillable = [
-        'bot_id', 'status', 'trigger', 'model', 'summary',
+        'bot_id', 'status', 'trigger', 'model', 'summary', 'analysis',
         'total_tokens', 'total_tool_calls', 'total_messages',
         'duration_ms', 'actions_taken', 'started_at', 'ended_at',
     ];

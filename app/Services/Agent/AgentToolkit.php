@@ -32,162 +32,57 @@ class AgentToolkit
     public function getToolDefinitions(): array
     {
         return [
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_market_data',
-                    'description' => 'Get current market technical indicators: price, RSI, SMA, MACD, Bollinger Bands, ATR, volume ratio. Use this to analyze market conditions.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'symbol' => ['type' => 'string', 'description' => 'Trading pair symbol, e.g. BTCUSDT'],
-                        ],
-                        'required' => ['symbol'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_bot_status',
-                    'description' => 'Get full bot status: config, PNL, grid range, open/filled orders count, SL/TP settings, investment, rounds.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                        ],
-                        'required' => ['bot_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_open_orders',
-                    'description' => 'List all open orders for a bot with price, side, quantity and grid level.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                        ],
-                        'required' => ['bot_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_filled_orders',
-                    'description' => 'List recently filled orders with PNL, fill time. Shows trading activity.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                            'limit' => ['type' => 'integer', 'description' => 'Max orders to return (default 20)'],
-                        ],
-                        'required' => ['bot_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'get_binance_position',
-                    'description' => 'Get the real Binance Futures position for this bot: size, entry price, unrealized PNL, liquidation price.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                        ],
-                        'required' => ['bot_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'set_stop_loss',
-                    'description' => 'Set or update the stop-loss price for a bot. The bot will close position and stop if price hits this level.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                            'price' => ['type' => 'number', 'description' => 'Stop-loss price in USDT'],
-                        ],
-                        'required' => ['bot_id', 'price'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'set_take_profit',
-                    'description' => 'Set or update the take-profit price for a bot. The bot will close position and stop if price hits this level.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                            'price' => ['type' => 'number', 'description' => 'Take-profit price in USDT'],
-                        ],
-                        'required' => ['bot_id', 'price'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'cancel_all_orders',
-                    'description' => 'Cancel ALL open orders on Binance for this bot. Use with caution - this removes the entire grid.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                        ],
-                        'required' => ['bot_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'stop_bot',
-                    'description' => 'Completely stop a bot: cancels all orders, marks bot as stopped. IRREVERSIBLE action - only use if conditions are dangerous.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                            'reason' => ['type' => 'string', 'description' => 'Reason for stopping'],
-                        ],
-                        'required' => ['bot_id', 'reason'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'close_position',
-                    'description' => 'Close the open Binance Futures position for this bot with a market order. Use to realize PNL or cut losses.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'bot_id' => ['type' => 'integer', 'description' => 'Bot ID'],
-                        ],
-                        'required' => ['bot_id'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'function',
-                'function' => [
-                    'name' => 'done',
-                    'description' => 'Signal that you have completed your analysis and actions. Provide a summary of findings and any actions taken.',
-                    'parameters' => [
-                        'type' => 'object',
-                        'properties' => [
-                            'summary' => ['type' => 'string', 'description' => 'Summary of analysis, findings, and actions taken'],
-                        ],
-                        'required' => ['summary'],
-                    ],
+            $this->tool('get_bot_status', 'Bot config, PNL, grid range, SL/TP, order counts.', [
+                'bot_id' => ['type' => 'integer'],
+            ]),
+            $this->tool('get_market_data', 'Price, RSI, SMA, MACD, Bollinger, ATR, volume.', [
+                'symbol' => ['type' => 'string'],
+            ]),
+            $this->tool('get_open_orders', 'Summary of open orders: buy/sell counts and price ranges.', [
+                'bot_id' => ['type' => 'integer'],
+            ]),
+            $this->tool('get_filled_orders', 'Last 3 filled orders + total PNL.', [
+                'bot_id' => ['type' => 'integer'],
+            ]),
+            $this->tool('get_binance_position', 'Live position: size, entry, unrealized PNL, liquidation.', [
+                'bot_id' => ['type' => 'integer'],
+            ]),
+            $this->tool('set_stop_loss', 'Set/update stop-loss price.', [
+                'bot_id' => ['type' => 'integer'],
+                'price' => ['type' => 'number'],
+            ]),
+            $this->tool('set_take_profit', 'Set/update take-profit price.', [
+                'bot_id' => ['type' => 'integer'],
+                'price' => ['type' => 'number'],
+            ]),
+            $this->tool('cancel_all_orders', 'Cancel ALL open orders. Destructive.', [
+                'bot_id' => ['type' => 'integer'],
+            ]),
+            $this->tool('stop_bot', 'Stop bot entirely. IRREVERSIBLE.', [
+                'bot_id' => ['type' => 'integer'],
+                'reason' => ['type' => 'string'],
+            ]),
+            $this->tool('close_position', 'Market-close the Binance position.', [
+                'bot_id' => ['type' => 'integer'],
+            ]),
+            $this->tool('done', 'Finish. analysis=Spanish market assessment (2-3 sentences). summary=1 short sentence.', [
+                'analysis' => ['type' => 'string'],
+                'summary' => ['type' => 'string'],
+            ]),
+        ];
+    }
+
+    private function tool(string $name, string $desc, array $props): array
+    {
+        return [
+            'type' => 'function',
+            'function' => [
+                'name' => $name,
+                'description' => $desc,
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => $props,
+                    'required' => array_keys($props),
                 ],
             ],
         ];
@@ -207,7 +102,7 @@ class AgentToolkit
                 'cancel_all_orders' => $this->toolCancelAllOrders($bot),
                 'stop_bot' => $this->toolStopBot($bot, $args),
                 'close_position' => $this->toolClosePosition($bot),
-                'done' => ['status' => 'done', 'summary' => $args['summary'] ?? ''],
+                'done' => ['ok' => true, 'analysis' => $args['analysis'] ?? null],
                 default => ['error' => "Unknown tool: {$name}"],
             };
         } catch (\Exception $e) {
@@ -253,45 +148,54 @@ class AgentToolkit
         $orders = $bot->orders()
             ->where('status', 'open')
             ->orderBy('price')
-            ->get(['id', 'side', 'price', 'quantity', 'grid_level'])
-            ->map(fn($o) => [
-                'id' => $o->id,
-                'side' => $o->side->value,
-                'price' => (float) $o->price,
-                'quantity' => (float) $o->quantity,
-                'grid_level' => $o->grid_level,
-            ]);
+            ->get(['side', 'price', 'grid_level']);
+
+        $buys = $orders->filter(fn($o) => $o->side->value === 'BUY');
+        $sells = $orders->filter(fn($o) => $o->side->value === 'SELL');
 
         return [
-            'count' => $orders->count(),
-            'buy_orders' => $orders->where('side', 'BUY')->count(),
-            'sell_orders' => $orders->where('side', 'SELL')->count(),
-            'lowest_buy' => $orders->where('side', 'BUY')->min('price'),
-            'highest_sell' => $orders->where('side', 'SELL')->max('price'),
-            'orders' => $orders->values()->toArray(),
+            'total' => $orders->count(),
+            'buys' => $buys->count(),
+            'sells' => $sells->count(),
+            'buy_range' => $buys->count() ? round($buys->min('price'), 1) . '-' . round($buys->max('price'), 1) : null,
+            'sell_range' => $sells->count() ? round($sells->min('price'), 1) . '-' . round($sells->max('price'), 1) : null,
+            'gap_levels' => $this->findGapLevels($orders, $bot->grid_count),
         ];
+    }
+
+    private function findGapLevels($orders, int $gridCount): array
+    {
+        $activeLevels = $orders->pluck('grid_level')->toArray();
+        $gaps = [];
+        for ($i = 0; $i <= $gridCount; $i++) {
+            if (!in_array($i, $activeLevels)) {
+                $gaps[] = $i;
+            }
+        }
+        return $gaps;
     }
 
     private function toolGetFilledOrders(Bot $bot, array $args): array
     {
-        $limit = min($args['limit'] ?? 20, 50);
-        $orders = $bot->orders()
+        $allFilled = $bot->orders()->where('status', 'filled');
+        $totalCount = $allFilled->count();
+        $totalPnl = round((clone $allFilled)->sum('pnl'), 4);
+
+        $recent = $bot->orders()
             ->where('status', 'filled')
             ->orderByDesc('filled_at')
-            ->limit($limit)
-            ->get(['id', 'side', 'price', 'quantity', 'pnl', 'grid_level', 'filled_at']);
+            ->limit(3)
+            ->get(['side', 'price', 'pnl', 'grid_level', 'filled_at']);
 
-        $totalPnl = $orders->sum('pnl');
         return [
-            'count' => $orders->count(),
-            'total_pnl' => round($totalPnl, 4),
-            'orders' => $orders->map(fn($o) => [
+            'total_filled' => $totalCount,
+            'total_pnl' => $totalPnl,
+            'last_3' => $recent->map(fn($o) => [
                 'side' => $o->side->value,
-                'price' => (float) $o->price,
-                'quantity' => (float) $o->quantity,
-                'pnl' => (float) $o->pnl,
-                'grid_level' => $o->grid_level,
-                'filled_at' => $o->filled_at,
+                'price' => round((float) $o->price, 1),
+                'pnl' => round((float) $o->pnl, 4),
+                'level' => $o->grid_level,
+                'ago' => $o->filled_at ? \Carbon\Carbon::parse($o->filled_at)->diffForHumans() : null,
             ])->toArray(),
         ];
     }
@@ -327,15 +231,19 @@ class AgentToolkit
             return ['error' => 'Invalid SL price'];
         }
 
-        $before = $bot->stop_loss_price;
+        $before = (float) $bot->stop_loss_price;
+        if (abs($price - $before) < 0.01) {
+            return ['skipped' => true, 'message' => "SL already at {$price}", 'stop_loss_price' => $before];
+        }
+
         $bot->update(['stop_loss_price' => $price]);
 
         $this->logAction($bot, 'sl_set', 'agent', [
             'price' => $price,
-            'previous' => $before,
+            'previous' => $before ?: null,
         ]);
 
-        return ['success' => true, 'stop_loss_price' => $price, 'previous' => $before];
+        return ['success' => true, 'stop_loss_price' => $price, 'previous' => $before ?: null];
     }
 
     private function toolSetTakeProfit(Bot $bot, array $args): array
@@ -345,15 +253,19 @@ class AgentToolkit
             return ['error' => 'Invalid TP price'];
         }
 
-        $before = $bot->take_profit_price;
+        $before = (float) $bot->take_profit_price;
+        if (abs($price - $before) < 0.01) {
+            return ['skipped' => true, 'message' => "TP already at {$price}", 'take_profit_price' => $before];
+        }
+
         $bot->update(['take_profit_price' => $price]);
 
         $this->logAction($bot, 'tp_set', 'agent', [
             'price' => $price,
-            'previous' => $before,
+            'previous' => $before ?: null,
         ]);
 
-        return ['success' => true, 'take_profit_price' => $price, 'previous' => $before];
+        return ['success' => true, 'take_profit_price' => $price, 'previous' => $before ?: null];
     }
 
     private function toolCancelAllOrders(Bot $bot): array

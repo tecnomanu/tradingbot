@@ -1,0 +1,100 @@
+version: "3.8"
+
+x-app: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  volumes:
+    - app-storage:/var/www/html/storage
+  environment:
+    - APP_NAME=${APP_NAME:-TradingBot}
+    - APP_ENV=${APP_ENV:-production}
+    - APP_KEY=${APP_KEY}
+    - APP_DEBUG=${APP_DEBUG:-false}
+    - APP_URL=${APP_URL}
+    - PHP_CLI_SERVER_WORKERS=4
+    - BCRYPT_ROUNDS=12
+    - LOG_CHANNEL=stack
+    - LOG_STACK=single
+    - LOG_LEVEL=${LOG_LEVEL:-warning}
+    - DB_CONNECTION=pgsql
+    - DB_HOST=tradingbot-postgres
+    - DB_PORT=5432
+    - DB_DATABASE=${DB_DATABASE:-tradingbot}
+    - DB_USERNAME=${DB_USERNAME:-tradingbot}
+    - DB_PASSWORD=${DB_PASSWORD}
+    - SESSION_DRIVER=database
+    - SESSION_LIFETIME=120
+    - BROADCAST_CONNECTION=log
+    - FILESYSTEM_DISK=local
+    - QUEUE_CONNECTION=redis
+    - CACHE_STORE=redis
+    - REDIS_CLIENT=phpredis
+    - REDIS_HOST=tradingbot-redis
+    - REDIS_PORT=6379
+    - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+    - AI_URL=${AI_URL}
+    - AI_MODEL=${AI_MODEL}
+    - AI_API_KEY=${AI_API_KEY}
+  restart: always
+
+services:
+  tradingbot-app:
+    <<: *app-base
+    depends_on:
+      tradingbot-postgres:
+        condition: service_healthy
+      tradingbot-redis:
+        condition: service_healthy
+
+  tradingbot-horizon:
+    <<: *app-base
+    entrypoint: []
+    command: ["php", "artisan", "horizon"]
+    depends_on:
+      tradingbot-postgres:
+        condition: service_healthy
+      tradingbot-redis:
+        condition: service_healthy
+
+  tradingbot-scheduler:
+    <<: *app-base
+    entrypoint: []
+    command: ["sh", "-c", "while true; do php artisan schedule:run --verbose --no-interaction; sleep 60; done"]
+    depends_on:
+      tradingbot-postgres:
+        condition: service_healthy
+      tradingbot-redis:
+        condition: service_healthy
+
+  tradingbot-postgres:
+    image: postgres:17-alpine
+    restart: always
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DB_DATABASE:-tradingbot}
+      - POSTGRES_USER=${DB_USERNAME:-tradingbot}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "${DB_DATABASE:-tradingbot}", "-U", "${DB_USERNAME:-tradingbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tradingbot-redis:
+    image: redis:alpine
+    restart: always
+    command: ["sh", "-c", "redis-server ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  app-storage:
+  postgres-data:
+  redis-data:

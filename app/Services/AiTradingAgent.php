@@ -241,68 +241,24 @@ class AiTradingAgent
 
     private function buildAnalysisPrompt(array $context): string
     {
-        $market = $context['market'];
-        $bot = $context['bot'];
+        $m = $context['market'];
+        $b = $context['bot'];
 
-        $gridRange = round((($bot['price_upper'] - $bot['price_lower']) / (($bot['price_upper'] + $bot['price_lower']) / 2)) * 100, 1);
-        $gridStep = round(($bot['price_upper'] - $bot['price_lower']) / $bot['grid_count'], 2);
-        $pricePositionInGrid = $bot['price_upper'] > $bot['price_lower']
-            ? round(($market['current_price'] - $bot['price_lower']) / ($bot['price_upper'] - $bot['price_lower']) * 100, 1)
+        $gridPos = $b['price_upper'] > $b['price_lower']
+            ? round(($m['current_price'] - $b['price_lower']) / ($b['price_upper'] - $b['price_lower']) * 100, 1)
             : 50;
 
         return <<<PROMPT
-You are an expert crypto grid trading analyst. Analyze the market conditions for an active grid bot and provide actionable recommendations.
+{$m['symbol']} Price:{$m['current_price']} 24h:{$m['price_change_24h']}% RSI:{$m['rsi_14']} MACD:{$m['macd']} Vol:{$m['volume_ratio']}x ATR:{$m['atr_14']} BB:{$m['bollinger_lower']}/{$m['bollinger_upper']}
+Bot: grid {$b['price_lower']}-{$b['price_upper']} ({$b['grid_count']}lvl) pos:{$gridPos}% PNL:{$b['total_pnl']} gridPnl:{$b['grid_profit']} open:{$b['open_orders']} filled:{$b['filled_orders']} SL:{$this->formatNullable($b['stop_loss_price'])} TP:{$this->formatNullable($b['take_profit_price'])}
 
-## MARKET DATA ({$market['symbol']})
-- Current Price: \${$market['current_price']}
-- 24h Change: {$market['price_change_24h']}%
-- RSI(14): {$market['rsi_14']}
-- SMA(20): \${$market['sma_20']} | SMA(50): \${$market['sma_50']}
-- MACD: {$market['macd']}
-- Volume Ratio: {$market['volume_ratio']}x (vs 20-period avg)
-- ATR(14): \${$market['atr_14']}
-- Bollinger Bands: Lower \${$market['bollinger_lower']} | Mid \${$market['bollinger_middle']} | Upper \${$market['bollinger_upper']}
-- Last 5 closes: {$this->formatArray($market['last_5_closes'])}
-
-## BOT CONFIGURATION
-- Grid Range: \${$bot['price_lower']} → \${$bot['price_upper']} ({$gridRange}% width)
-- Grid Count: {$bot['grid_count']} (step: \${$gridStep})
-- Investment: \${$bot['investment']}
-- Open Orders: {$bot['open_orders']} | Filled: {$bot['filled_orders']}
-- Total PNL: \${$bot['total_pnl']} | Grid Profit: \${$bot['grid_profit']}
-- Rounds Completed: {$bot['total_rounds']}
-- Price Position in Grid: {$pricePositionInGrid}% from lower bound
-- Stop Loss: {$this->formatNullable($bot['stop_loss_price'])} | Take Profit: {$this->formatNullable($bot['take_profit_price'])}
-
-## INSTRUCTIONS
-Respond ONLY in valid JSON with this exact structure:
-```json
-{
-  "signal": "bullish|bearish|neutral",
-  "confidence": 0.0-1.0,
-  "reasoning": "2-3 sentence analysis of current market conditions and bot positioning",
-  "risk_level": "low|medium|high",
-  "suggestion": {
-    "action": "hold|adjust_grid|set_sl|set_tp|widen_range|narrow_range|stop_bot",
-    "details": "specific actionable recommendation",
-    "new_lower": null or number,
-    "new_upper": null or number,
-    "new_sl": null or number,
-    "new_tp": null or number
-  }
-}
-```
+Reply ONLY valid JSON, no extra text: {"signal":"bullish|bearish|neutral","confidence":0-1,"reasoning":"max 15 words","suggestion":{"action":"hold|set_sl|set_tp|adjust_grid|widen_range|narrow_range|stop_bot","new_sl":null,"new_tp":null}}
 PROMPT;
-    }
-
-    private function formatArray(array $arr): string
-    {
-        return implode(', ', array_map(fn($v) => '$' . number_format($v, 2), $arr));
     }
 
     private function formatNullable(?float $value): string
     {
-        return $value ? '$' . number_format($value, 2) : 'Not set';
+        return $value ? (string) round($value, 1) : 'none';
     }
 
     private function callLlm(string $prompt): ?array
@@ -316,15 +272,15 @@ PROMPT;
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'You are a professional crypto trading analyst. Respond only in valid JSON. Be concise and actionable.',
+                        'content' => 'Crypto grid bot analyst. JSON only, no markdown, no thinking. Keep reasoning under 15 words.',
                     ],
                     [
                         'role' => 'user',
                         'content' => $prompt,
                     ],
                 ],
-                'temperature' => 0.3,
-                'max_tokens' => 800,
+                'temperature' => 0.1,
+                'max_tokens' => 300,
             ]);
 
             if (!$response->successful()) {
@@ -338,6 +294,14 @@ PROMPT;
             $data = $response->json();
             $content = $data['choices'][0]['message']['content'] ?? null;
             $tokens = $data['usage']['total_tokens'] ?? null;
+
+            if (!$content) {
+                return null;
+            }
+
+            // Strip thinking tags (closed or unclosed)
+            $content = preg_replace('/<think>.*?(<\/think>|$)/s', '', $content);
+            $content = trim($content);
 
             if (!$content) {
                 return null;
@@ -360,6 +324,9 @@ PROMPT;
         }
 
         $content = $response['content'];
+
+        // Strip LLM thinking tags (qwen3, deepseek, etc.)
+        $content = preg_replace('/<think>.*?<\/think>/s', '', $content);
 
         if (preg_match('/```json\s*(.*?)\s*```/s', $content, $matches)) {
             $content = $matches[1];

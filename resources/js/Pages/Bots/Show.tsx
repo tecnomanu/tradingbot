@@ -12,7 +12,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import {
     Bot,
@@ -34,11 +36,15 @@ import {
     Brain,
     CheckCircle,
     Clock,
+    FlaskConical,
+    Loader2,
     Pencil,
     Play,
+    Save,
     Trash2,
     XCircle,
 } from "lucide-react";
+import { useState } from "react";
 import {
     Area,
     AreaChart,
@@ -334,6 +340,10 @@ export default function Show({
                     </TabsTrigger>
                     <TabsTrigger value="parametros">Parámetros</TabsTrigger>
                     <TabsTrigger value="pnl">PNL</TabsTrigger>
+                    <TabsTrigger value="ai" className="gap-1.5">
+                        <Brain className="h-3.5 w-3.5" />
+                        AI Agent
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="envivo" className="space-y-4">
@@ -995,7 +1005,160 @@ export default function Show({
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="ai" className="space-y-4">
+                    <AiPromptConfig bot={bot} />
+                </TabsContent>
             </Tabs>
         </AuthenticatedLayout>
+    );
+}
+
+const DEFAULT_SYSTEM_PROMPT = `Grid trading bot advisor. Review bot state, analyze market, take action if needed.
+
+Rules:
+- Call get_bot_status + get_market_data first. Only call other tools if something looks off.
+- Be conservative: act only with clear reason. Destructive actions need strong justification.
+- Do NOT set SL/TP if already set at the same price. Only call set_stop_loss/set_take_profit when changing to a NEW value.
+- Set/adjust SL/TP if: price near grid edge, RSI extreme (>70/<30), or negative unrealized PNL.
+- If price outside grid range: critical, consider stopping.
+- Call done when finished. In "analysis": write a human-readable market assessment in Spanish (2-3 sentences max explaining what you see and why you acted or not). In "summary": 1 short sentence. All prices USDT.`;
+
+const DEFAULT_USER_PROMPT = `Review Bot #{bot_id} ({symbol}) at {now} UTC. Call get_bot_status and get_market_data. Only call other tools if something looks abnormal. Then call done with a brief summary.`;
+
+function AiPromptConfig({ bot }: { bot: Bot }) {
+    const [systemPrompt, setSystemPrompt] = useState(bot.ai_system_prompt ?? "");
+    const [userPrompt, setUserPrompt] = useState(bot.ai_user_prompt ?? "");
+    const [saving, setSaving] = useState(false);
+    const [testing, setTesting] = useState(false);
+    const [review, setReview] = useState<string | null>(null);
+    const [saved, setSaved] = useState(false);
+
+    const handleSave = () => {
+        setSaving(true);
+        setSaved(false);
+        router.put(
+            `/ai-agent/bots/${bot.id}/prompts`,
+            { ai_system_prompt: systemPrompt, ai_user_prompt: userPrompt },
+            {
+                preserveScroll: true,
+                onSuccess: () => setSaved(true),
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    const handleTest = async () => {
+        setTesting(true);
+        setReview(null);
+        try {
+            const res = await fetch(`/ai-agent/bots/${bot.id}/test-prompts`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
+                },
+                body: JSON.stringify({
+                    ai_system_prompt: systemPrompt || null,
+                    ai_user_prompt: userPrompt || null,
+                }),
+            });
+            const data = await res.json();
+            setReview(data.review || data.error || "Sin respuesta");
+        } catch (e: any) {
+            setReview("Error: " + e.message);
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    const handleReset = () => {
+        setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+        setUserPrompt(DEFAULT_USER_PROMPT);
+        setSaved(false);
+    };
+
+    return (
+        <div className="space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        Configuración del AI Agent
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        Personalizá el comportamiento del agente para este bot.
+                        Dejá vacío para usar la configuración por defecto.
+                        Variables disponibles en el primer mensaje: <code className="text-xs bg-muted px-1 rounded">{"{bot_id}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{symbol}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{now}"}</code>
+                    </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="system-prompt">System Prompt</Label>
+                        <Textarea
+                            id="system-prompt"
+                            value={systemPrompt}
+                            onChange={(e) => { setSystemPrompt(e.target.value); setSaved(false); }}
+                            placeholder={DEFAULT_SYSTEM_PROMPT}
+                            rows={10}
+                            className="font-mono text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Define las reglas, personalidad y estrategia del agente. Ej: más agresivo, priorizar RSI+SMA, etc.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="user-prompt">Primer Mensaje</Label>
+                        <Textarea
+                            id="user-prompt"
+                            value={userPrompt}
+                            onChange={(e) => { setUserPrompt(e.target.value); setSaved(false); }}
+                            placeholder={DEFAULT_USER_PROMPT}
+                            rows={4}
+                            className="font-mono text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            El mensaje inicial que recibe el agente en cada consulta.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            {saving ? "Guardando..." : "Guardar"}
+                        </Button>
+                        <Button onClick={handleTest} disabled={testing} variant="secondary" className="gap-1.5">
+                            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+                            {testing ? "Analizando..." : "Test con IA"}
+                        </Button>
+                        <Button onClick={handleReset} variant="ghost" className="text-muted-foreground">
+                            Restaurar por defecto
+                        </Button>
+                        {saved && (
+                            <span className="flex items-center gap-1 text-sm text-emerald-400">
+                                <CheckCircle className="h-4 w-4" /> Guardado
+                            </span>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {review && (
+                <Card className="border-primary/30">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <FlaskConical className="h-4 w-4" />
+                            Evaluación de la configuración
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap text-sm">
+                            {review}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
     );
 }

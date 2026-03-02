@@ -19,7 +19,7 @@ class RunAiAnalysisJob implements ShouldQueue, ShouldBeUnique
 
     public int $tries = 1;
     public int $timeout = 60;
-    public int $uniqueFor = 300; // 5 minutes uniqueness
+    public int $uniqueFor = 600; // 10 minutes uniqueness
 
     public function uniqueId(): string
     {

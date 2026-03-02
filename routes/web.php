@@ -35,6 +35,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/ai-agent/conversations/{conversation}', [AiAgentController::class, 'showConversation'])->name('ai-agent.conversation');
     Route::post('/ai-agent/consult', [AiAgentController::class, 'runConsultation'])->name('ai-agent.consult');
     Route::post('/ai-agent/quick-analysis', [AiAgentController::class, 'runQuickAnalysis'])->name('ai-agent.quick-analysis');
+    Route::put('/ai-agent/bots/{bot}/prompts', [AiAgentController::class, 'updateBotPrompts'])->name('ai-agent.update-prompts');
+    Route::post('/ai-agent/bots/{bot}/test-prompts', [AiAgentController::class, 'testBotPrompts'])->name('ai-agent.test-prompts');
 
     // Binance Accounts
     Route::resource('binance-accounts', BinanceAccountController::class)->except(['create', 'show', 'edit']);

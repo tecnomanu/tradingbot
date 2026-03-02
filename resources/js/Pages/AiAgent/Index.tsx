@@ -1,7 +1,15 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -9,7 +17,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import {
@@ -24,7 +31,7 @@ import {
     Wrench,
     Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 
 interface Conversation {
     id: number;
@@ -33,6 +40,7 @@ interface Conversation {
     trigger: string;
     model: string | null;
     summary: string | null;
+    analysis: string | null;
     total_tokens: number;
     total_tool_calls: number;
     total_messages: number;
@@ -45,6 +53,7 @@ interface Conversation {
 interface ActionLog {
     id: number;
     bot_id: number;
+    conversation_id: number | null;
     action: string;
     source: string;
     details: Record<string, any> | null;
@@ -54,10 +63,12 @@ interface ActionLog {
 
 interface QuickAnalysis {
     id: number;
+    bot_id: number | null;
     symbol: string;
     signal: string | null;
     confidence: number | null;
     reasoning: string | null;
+    suggestion: { action?: string } | null;
     created_at: string;
 }
 
@@ -90,13 +101,19 @@ function timeAgo(date: Date): string {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
     if (seconds < 60) return "hace unos segundos";
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60)
-        return `hace ${minutes} min`;
+    if (minutes < 60) return `hace ${minutes} min`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24)
-        return `hace ${hours}h`;
+    if (hours < 24) return `hace ${hours}h`;
     const days = Math.floor(hours / 24);
     return `hace ${days}d`;
+}
+
+function formatTimestamp(date: Date): string {
+    const hoursAgo = (Date.now() - date.getTime()) / 3600000;
+    const time = date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+    if (hoursAgo < 24) return time;
+    const day = date.toLocaleDateString("es", { day: "2-digit", month: "2-digit" });
+    return `${day} ${time}`;
 }
 
 const actionLabels: Record<string, string> = {
@@ -123,6 +140,41 @@ const signalColors: Record<string, string> = {
     neutral: "text-yellow-400",
 };
 
+const signalBg: Record<string, string> = {
+    bullish: "bg-emerald-500/10 border-emerald-500/20",
+    bearish: "bg-red-500/10 border-red-500/20",
+    neutral: "bg-yellow-500/10 border-yellow-500/20",
+};
+
+function formatActionDetails(action: string, details: Record<string, any> | null): string {
+    if (!details) return "";
+    switch (action) {
+        case "sl_set":
+            return `$${Number(details.price).toLocaleString()}${details.previous ? ` (anterior: $${Number(details.previous).toLocaleString()})` : ""}`;
+        case "tp_set":
+            return `$${Number(details.price).toLocaleString()}${details.previous ? ` (anterior: $${Number(details.previous).toLocaleString()})` : ""}`;
+        case "orders_cancelled":
+            return `${details.cancelled_count} órdenes canceladas`;
+        case "bot_stopped":
+            return details.reason || "";
+        case "position_closed":
+            return `${details.close_side} ${Math.abs(details.size)} | PNL: ${details.unrealized_pnl}`;
+        default:
+            return JSON.stringify(details);
+    }
+}
+
+function SectionDivider({ label }: { label: string }) {
+    return (
+        <div className="flex items-center gap-3 px-4 py-2 bg-muted/30">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {label}
+            </span>
+            <div className="h-px flex-1 bg-border" />
+        </div>
+    );
+}
+
 export default function AiAgentIndex({
     conversations,
     actionLogs,
@@ -131,17 +183,73 @@ export default function AiAgentIndex({
     userBots,
 }: Props) {
     const flash = usePage().props.flash as any;
-    const [selectedBot, setSelectedBot] = useState<string>(
-        userBots[0]?.id?.toString() || "",
-    );
+    const [selectedBot, setSelectedBot] = useState<string>("all");
     const [consulting, setConsulting] = useState(false);
 
+    const filterBotId = selectedBot === "all" ? null : parseInt(selectedBot);
+
+    const filteredConversations = useMemo(
+        () =>
+            filterBotId
+                ? conversations.data.filter((c) => c.bot_id === filterBotId)
+                : conversations.data,
+        [conversations.data, filterBotId],
+    );
+
+    const filteredActions = useMemo(
+        () =>
+            filterBotId
+                ? actionLogs.filter((a) => a.bot_id === filterBotId)
+                : actionLogs,
+        [actionLogs, filterBotId],
+    );
+
+    const filteredAnalyses = useMemo(
+        () =>
+            filterBotId
+                ? quickAnalyses.filter((a) => a.bot_id === filterBotId)
+                : quickAnalyses,
+        [quickAnalyses, filterBotId],
+    );
+
+    const latestAnalysis = filteredAnalyses[0] ?? null;
+    const olderAnalyses = filteredAnalyses.slice(1);
+
+    const latestConversation = filteredConversations[0] ?? null;
+    const olderConversations = filteredConversations.slice(1);
+
+    const latestActionGroup = useMemo(() => {
+        if (filteredActions.length === 0) return { latest: [], older: [] };
+        const firstId = filteredActions[0]?.conversation_id;
+        if (!firstId) return { latest: [filteredActions[0]], older: filteredActions.slice(1) };
+        const latest = filteredActions.filter((a) => a.conversation_id === firstId);
+        const older = filteredActions.filter((a) => a.conversation_id !== firstId);
+        return { latest, older };
+    }, [filteredActions]);
+
+    const [consultDialogOpen, setConsultDialogOpen] = useState(false);
+    const [consultBotId, setConsultBotId] = useState<string>("");
+
+    const openConsultDialog = () => {
+        const activeBots = userBots.filter((b) => b.status === "active");
+        if (activeBots.length === 1) {
+            setConsultBotId(activeBots[0].id.toString());
+        } else if (filterBotId) {
+            setConsultBotId(filterBotId.toString());
+        } else {
+            setConsultBotId("");
+        }
+        setConsultDialogOpen(true);
+    };
+
     const handleConsult = () => {
-        if (!selectedBot) return;
+        const botId = parseInt(consultBotId);
+        if (!botId) return;
+        setConsultDialogOpen(false);
         setConsulting(true);
         router.post(
             "/ai-agent/consult",
-            { bot_id: parseInt(selectedBot) },
+            { bot_id: botId },
             { preserveScroll: true, onFinish: () => setConsulting(false) },
         );
     };
@@ -157,40 +265,30 @@ export default function AiAgentIndex({
                             <Brain className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">
-                                AI Trading Agent
-                            </h1>
+                            <h1 className="text-2xl font-bold tracking-tight">AI Trading Agent</h1>
                             <p className="text-sm text-muted-foreground">
-                                Supervisor inteligente con herramientas de
-                                trading
+                                Supervisor inteligente con herramientas de trading
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Select
-                            value={selectedBot}
-                            onValueChange={setSelectedBot}
-                        >
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Seleccionar bot" />
+                        <Select value={selectedBot} onValueChange={setSelectedBot}>
+                            <SelectTrigger className="w-[200px]">
+                                <SelectValue placeholder="Filtrar bot" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="all">Todos los bots</SelectItem>
                                 {userBots.map((b) => (
-                                    <SelectItem
-                                        key={b.id}
-                                        value={b.id.toString()}
-                                    >
+                                    <SelectItem key={b.id} value={b.id.toString()}>
                                         #{b.id} {b.symbol}{" "}
-                                        <span className="text-muted-foreground">
-                                            ({b.status})
-                                        </span>
+                                        <span className="text-muted-foreground">({b.status})</span>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                         <Button
-                            onClick={handleConsult}
-                            disabled={!selectedBot || consulting}
+                            onClick={openConsultDialog}
+                            disabled={consulting}
                             className="gap-1.5"
                         >
                             {consulting ? (
@@ -198,9 +296,7 @@ export default function AiAgentIndex({
                             ) : (
                                 <Play className="h-4 w-4" />
                             )}
-                            {consulting
-                                ? "Consultando..."
-                                : "Consultar Agente"}
+                            {consulting ? "Consultando..." : "Consultar Agente"}
                         </Button>
                     </div>
                 </div>
@@ -218,234 +314,72 @@ export default function AiAgentIndex({
 
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                    <Card className="bg-card/50">
-                        <CardContent className="p-3">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <MessageSquare className="h-3.5 w-3.5" />
-                                Consultas
-                            </div>
-                            <p className="mt-1 text-xl font-bold tabular-nums">
-                                {stats.total_conversations}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-card/50">
-                        <CardContent className="p-3">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Wrench className="h-3.5 w-3.5" />
-                                Tool Calls
-                            </div>
-                            <p className="mt-1 text-xl font-bold tabular-nums">
-                                {stats.total_tool_calls}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-card/50">
-                        <CardContent className="p-3">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Shield className="h-3.5 w-3.5" />
-                                Acciones
-                            </div>
-                            <p className="mt-1 text-xl font-bold tabular-nums">
-                                {stats.total_actions}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-card/50">
-                        <CardContent className="p-3">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Clock className="h-3.5 w-3.5" />
-                                Duración Prom.
-                            </div>
-                            <p className="mt-1 text-xl font-bold tabular-nums">
-                                {stats.avg_duration
-                                    ? `${(stats.avg_duration / 1000).toFixed(1)}s`
-                                    : "—"}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-card/50">
-                        <CardContent className="p-3">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Zap className="h-3.5 w-3.5" />
-                                Análisis Rápidos
-                            </div>
-                            <p className="mt-1 text-xl font-bold tabular-nums">
-                                {stats.total_quick_analyses}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    {[
+                        { icon: Zap, label: "Análisis", value: stats.total_quick_analyses },
+                        { icon: MessageSquare, label: "Consultas", value: stats.total_conversations },
+                        { icon: Wrench, label: "Tool Calls", value: stats.total_tool_calls },
+                        { icon: Shield, label: "Acciones", value: stats.total_actions },
+                        {
+                            icon: Clock,
+                            label: "Duración Prom.",
+                            value: stats.avg_duration ? `${(stats.avg_duration / 1000).toFixed(1)}s` : "—",
+                        },
+                    ].map(({ icon: Icon, label, value }) => (
+                        <Card key={label} className="bg-card/50">
+                            <CardContent className="p-3">
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {label}
+                                </div>
+                                <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
 
-                {/* Tabs */}
-                <Tabs defaultValue="conversations">
+                {/* Tabs - Reordered: Análisis > Acciones > Conversaciones */}
+                <Tabs defaultValue="quick">
                     <TabsList>
-                        <TabsTrigger value="conversations" className="gap-1.5">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            Conversaciones
+                        <TabsTrigger value="quick" className="gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Análisis Rápido
                         </TabsTrigger>
                         <TabsTrigger value="actions" className="gap-1.5">
                             <Activity className="h-3.5 w-3.5" />
                             Acciones del Bot
                         </TabsTrigger>
-                        <TabsTrigger value="quick" className="gap-1.5">
-                            <Sparkles className="h-3.5 w-3.5" />
-                            Análisis Rápido
+                        <TabsTrigger value="conversations" className="gap-1.5">
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            Conversaciones
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* Conversations Tab */}
-                    <TabsContent value="conversations">
+                    {/* Quick Analysis Tab */}
+                    <TabsContent value="quick">
                         <Card className="bg-card/50">
                             <CardContent className="p-0">
-                                {conversations.data.length === 0 ? (
+                                {filteredAnalyses.length === 0 ? (
                                     <div className="flex flex-col items-center gap-3 py-16 text-center">
-                                        <Brain className="h-12 w-12 text-muted-foreground/30" />
-                                        <p className="text-muted-foreground">
-                                            Sin consultas todavía. El agente
-                                            consulta automáticamente cada 15
-                                            min.
-                                        </p>
+                                        <Sparkles className="h-12 w-12 text-muted-foreground/30" />
+                                        <p className="text-muted-foreground">Sin análisis rápidos</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-border">
-                                        {conversations.data.map(
-                                            (conv, idx) => {
-                                                const seqNum =
-                                                    conversations.data.length -
-                                                    idx;
-                                                const d = new Date(
-                                                    conv.created_at,
-                                                );
-                                                const ago = timeAgo(d);
-                                                const hasActions =
-                                                    conv.actions_taken &&
-                                                    conv.actions_taken.length >
-                                                        0;
-                                                return (
-                                                    <Link
-                                                        key={conv.id}
-                                                        href={`/ai-agent/conversations/${conv.id}`}
-                                                        className="flex items-start gap-4 p-4 transition-colors hover:bg-muted/20"
-                                                    >
-                                                        <div className="flex flex-col items-center gap-1 pt-0.5">
-                                                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                                                                {seqNum}
-                                                            </span>
-                                                            {hasActions && (
-                                                                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 space-y-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-medium">
-                                                                    {conv.bot
-                                                                        ?.symbol ||
-                                                                        "?"}
-                                                                </span>
-                                                                <Badge
-                                                                    variant={
-                                                                        conv.status ===
-                                                                        "completed"
-                                                                            ? "default"
-                                                                            : conv.status ===
-                                                                                "running"
-                                                                              ? "secondary"
-                                                                              : "destructive"
-                                                                    }
-                                                                    className="text-[10px]"
-                                                                >
-                                                                    {
-                                                                        conv.status
-                                                                    }
-                                                                </Badge>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="text-[10px]"
-                                                                >
-                                                                    {
-                                                                        conv.trigger
-                                                                    }
-                                                                </Badge>
-                                                                {conv.model && (
-                                                                    <span className="text-[10px] text-muted-foreground">
-                                                                        ·{" "}
-                                                                        {
-                                                                            conv.model
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {conv.summary && (
-                                                                <p className="line-clamp-2 text-sm text-muted-foreground">
-                                                                    {
-                                                                        conv.summary
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                                                <span>
-                                                                    {
-                                                                        conv.total_tool_calls
-                                                                    }{" "}
-                                                                    tools
-                                                                </span>
-                                                                <span>
-                                                                    {
-                                                                        conv.total_tokens
-                                                                    }{" "}
-                                                                    tokens
-                                                                </span>
-                                                                {conv.duration_ms && (
-                                                                    <span>
-                                                                        {(
-                                                                            conv.duration_ms /
-                                                                            1000
-                                                                        ).toFixed(
-                                                                            1,
-                                                                        )}
-                                                                        s
-                                                                    </span>
-                                                                )}
-                                                                {hasActions && (
-                                                                    <span className="text-yellow-400">
-                                                                        {
-                                                                            conv
-                                                                                .actions_taken!
-                                                                                .length
-                                                                        }{" "}
-                                                                        acciones
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground whitespace-nowrap pt-0.5">
-                                                            <span>
-                                                                {d.toLocaleDateString(
-                                                                    "es",
-                                                                    {
-                                                                        day: "2-digit",
-                                                                        month: "2-digit",
-                                                                    },
-                                                                )}{" "}
-                                                                {d.toLocaleTimeString(
-                                                                    "es",
-                                                                    {
-                                                                        hour: "2-digit",
-                                                                        minute: "2-digit",
-                                                                    },
-                                                                )}
-                                                            </span>
-                                                            <span className="text-[10px]">
-                                                                {ago}
-                                                            </span>
-                                                            <ArrowRight className="mt-1 h-3.5 w-3.5" />
-                                                        </div>
-                                                    </Link>
-                                                );
-                                            },
+                                    <>
+                                        {latestAnalysis && (
+                                            <>
+                                                <SectionDivider label="Último análisis" />
+                                                <AnalysisItem a={latestAnalysis} highlight />
+                                            </>
                                         )}
-                                    </div>
+                                        {olderAnalyses.length > 0 && (
+                                            <>
+                                                <SectionDivider label="Histórico" />
+                                                {olderAnalyses.map((a) => (
+                                                    <AnalysisItem key={a.id} a={a} />
+                                                ))}
+                                            </>
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
@@ -455,120 +389,246 @@ export default function AiAgentIndex({
                     <TabsContent value="actions">
                         <Card className="bg-card/50">
                             <CardContent className="p-0">
-                                {actionLogs.length === 0 ? (
+                                {filteredActions.length === 0 ? (
                                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                                         <Shield className="h-12 w-12 text-muted-foreground/30" />
-                                        <p className="text-muted-foreground">
-                                            Sin acciones registradas
-                                        </p>
+                                        <p className="text-muted-foreground">Sin acciones registradas</p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-border">
-                                        {actionLogs.map((log) => (
-                                            <div
-                                                key={log.id}
-                                                className="flex items-start justify-between gap-4 p-4"
-                                            >
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span
-                                                            className={`font-medium ${actionColors[log.action] || "text-foreground"}`}
-                                                        >
-                                                            {actionLabels[
-                                                                log.action
-                                                            ] || log.action}
-                                                        </span>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs"
-                                                        >
-                                                            {log.source}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="text-xs"
-                                                        >
-                                                            {log.bot?.symbol ||
-                                                                `Bot #${log.bot_id}`}
-                                                        </Badge>
-                                                    </div>
-                                                    {log.details && (
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {JSON.stringify(
-                                                                log.details,
-                                                            )}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                                                    {new Date(
-                                                        log.created_at,
-                                                    ).toLocaleString()}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <>
+                                        {latestActionGroup.latest.length > 0 && (
+                                            <>
+                                                <SectionDivider label="Última acción" />
+                                                {latestActionGroup.latest.map((log) => (
+                                                    <ActionItem key={log.id} log={log} />
+                                                ))}
+                                            </>
+                                        )}
+                                        {latestActionGroup.older.length > 0 && (
+                                            <>
+                                                <SectionDivider label="Histórico" />
+                                                {latestActionGroup.older.map((log) => (
+                                                    <ActionItem key={log.id} log={log} />
+                                                ))}
+                                            </>
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
                     </TabsContent>
 
-                    {/* Quick Analysis Tab */}
-                    <TabsContent value="quick">
+                    {/* Conversations Tab */}
+                    <TabsContent value="conversations">
                         <Card className="bg-card/50">
                             <CardContent className="p-0">
-                                {quickAnalyses.length === 0 ? (
+                                {filteredConversations.length === 0 ? (
                                     <div className="flex flex-col items-center gap-3 py-16 text-center">
-                                        <Sparkles className="h-12 w-12 text-muted-foreground/30" />
+                                        <Brain className="h-12 w-12 text-muted-foreground/30" />
                                         <p className="text-muted-foreground">
-                                            Sin análisis rápidos
+                                            Sin consultas todavía. El agente consulta automáticamente cada 15 min.
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="divide-y divide-border">
-                                        {quickAnalyses.map((a) => (
-                                            <div
-                                                key={a.id}
-                                                className="p-4 space-y-1"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span
-                                                        className={`font-medium ${signalColors[a.signal || "neutral"]}`}
-                                                    >
-                                                        {a.signal || "—"}
-                                                    </span>
-                                                    <Badge variant="secondary">
-                                                        {a.symbol}
-                                                    </Badge>
-                                                    {a.confidence != null && (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {Math.round(
-                                                                a.confidence *
-                                                                    100,
-                                                            )}
-                                                            % confianza
-                                                        </span>
-                                                    )}
-                                                    <span className="ml-auto text-xs text-muted-foreground">
-                                                        {new Date(
-                                                            a.created_at,
-                                                        ).toLocaleString()}
-                                                    </span>
-                                                </div>
-                                                {a.reasoning && (
-                                                    <p className="text-sm text-muted-foreground line-clamp-2">
-                                                        {a.reasoning}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <>
+                                        {latestConversation && (
+                                            <>
+                                                <SectionDivider label="Última consulta" />
+                                                <ConversationItem conv={latestConversation} highlight />
+                                            </>
+                                        )}
+                                        {olderConversations.length > 0 && (
+                                            <>
+                                                <SectionDivider label="Histórico" />
+                                                {olderConversations.map((conv) => (
+                                                    <ConversationItem key={conv.id} conv={conv} />
+                                                ))}
+                                            </>
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
                     </TabsContent>
                 </Tabs>
             </div>
+
+            <Dialog open={consultDialogOpen} onOpenChange={setConsultDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Consultar AI Agent</DialogTitle>
+                        <DialogDescription>
+                            El agente revisará el estado del bot, analizará el mercado y tomará acciones si es necesario.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <label className="text-sm font-medium">Seleccioná el bot a consultar</label>
+                        <Select value={consultBotId} onValueChange={setConsultBotId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Elegí un bot..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {userBots.map((b) => (
+                                    <SelectItem key={b.id} value={b.id.toString()}>
+                                        <span className="flex items-center gap-2">
+                                            #{b.id} {b.symbol}
+                                            <Badge
+                                                variant={b.status === "active" ? "default" : "secondary"}
+                                                className="text-[10px]"
+                                            >
+                                                {b.status}
+                                            </Badge>
+                                        </span>
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConsultDialogOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleConsult} disabled={!consultBotId} className="gap-1.5">
+                            <Play className="h-4 w-4" />
+                            Consultar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AuthenticatedLayout>
+    );
+}
+
+function AnalysisItem({ a, highlight }: { a: QuickAnalysis; highlight?: boolean }) {
+    const d = new Date(a.created_at);
+    const signal = a.signal || "neutral";
+    const action = a.suggestion?.action || "none";
+    const [expanded, setExpanded] = useState(false);
+    const [clamped, setClamped] = useState(false);
+    const textRef = useRef<HTMLParagraphElement>(null);
+
+    useEffect(() => {
+        const el = textRef.current;
+        if (el && !highlight) {
+            setClamped(el.scrollHeight > el.clientHeight + 2);
+        }
+    }, [a.reasoning, highlight]);
+
+    return (
+        <div className={`p-4 space-y-1 ${highlight ? "border-l-2 border-primary" : ""}`}>
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${signalBg[signal]} ${signalColors[signal]}`}>
+                    {signal}
+                </span>
+                <Badge variant="secondary" className="text-xs">{a.symbol}</Badge>
+                {a.confidence != null && (
+                    <span className="text-xs text-muted-foreground">
+                        {Math.round(a.confidence * 100)}%
+                    </span>
+                )}
+                {action !== "hold" && action !== "none" && (
+                    <Badge variant="outline" className="text-xs">{action}</Badge>
+                )}
+                <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
+                    {formatTimestamp(d)} · {timeAgo(d)}
+                </span>
+            </div>
+            {a.reasoning && (
+                <div>
+                    <p
+                        ref={textRef}
+                        className={`text-sm text-muted-foreground ${!highlight && !expanded ? "line-clamp-2" : ""}`}
+                    >
+                        {a.reasoning}
+                    </p>
+                    {!highlight && clamped && (
+                        <button
+                            onClick={() => setExpanded(!expanded)}
+                            className="text-xs text-primary hover:underline mt-0.5"
+                        >
+                            {expanded ? "ver menos" : "ver más"}
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ActionItem({ log }: { log: ActionLog }) {
+    const d = new Date(log.created_at);
+    const details = formatActionDetails(log.action, log.details);
+
+    return (
+        <div className="flex items-center justify-between gap-4 p-4">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <span className={`font-medium text-sm ${actionColors[log.action] || "text-foreground"}`}>
+                    {actionLabels[log.action] || log.action}
+                </span>
+                <Badge variant="outline" className="text-[10px]">{log.source}</Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                    {log.bot?.symbol || `Bot #${log.bot_id}`}
+                </Badge>
+                {details && (
+                    <span className="text-xs text-muted-foreground truncate">{details}</span>
+                )}
+            </div>
+            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {formatTimestamp(d)} · {timeAgo(d)}
+            </span>
+        </div>
+    );
+}
+
+function ConversationItem({ conv, highlight }: { conv: Conversation; highlight?: boolean }) {
+    const d = new Date(conv.created_at);
+    const hasActions = conv.actions_taken && conv.actions_taken.length > 0;
+    const displayText = conv.analysis || conv.summary;
+
+    return (
+        <Link
+            href={`/ai-agent/conversations/${conv.id}`}
+            className={`flex items-start gap-4 p-4 transition-colors hover:bg-muted/20 ${highlight ? "border-l-2 border-primary" : ""}`}
+        >
+            <div className="flex-1 space-y-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm">{conv.bot?.symbol || "?"}</span>
+                    <Badge
+                        variant={
+                            conv.status === "completed"
+                                ? "default"
+                                : conv.status === "running"
+                                  ? "secondary"
+                                  : "destructive"
+                        }
+                        className="text-[10px]"
+                    >
+                        {conv.status}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">{conv.trigger}</Badge>
+                    {conv.model && (
+                        <span className="text-[10px] text-muted-foreground">· {conv.model}</span>
+                    )}
+                </div>
+                {displayText && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{displayText}</p>
+                )}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    <span>{conv.total_tool_calls} tools</span>
+                    <span>{conv.total_tokens} tokens</span>
+                    {conv.duration_ms && <span>{(conv.duration_ms / 1000).toFixed(1)}s</span>}
+                    {hasActions && (
+                        <span className="text-yellow-400">
+                            {conv.actions_taken!.length} acciones
+                        </span>
+                    )}
+                </div>
+            </div>
+            <div className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground whitespace-nowrap pt-0.5">
+                <span>{formatTimestamp(d)}</span>
+                <span className="text-[10px]">{timeAgo(d)}</span>
+                <ArrowRight className="mt-1 h-3.5 w-3.5" />
+            </div>
+        </Link>
     );
 }

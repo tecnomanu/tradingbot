@@ -33,6 +33,10 @@ export interface Bot {
     trend_pnl: number;
     total_rounds: number;
     rounds_24h: number;
+    stop_loss_price: number | null;
+    take_profit_price: number | null;
+    ai_system_prompt: string | null;
+    ai_user_prompt: string | null;
     started_at: string | null;
     stopped_at: string | null;
     created_at: string;

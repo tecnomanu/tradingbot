@@ -10,7 +10,7 @@ use App\Support\BotLog as Log;
 
 class AgentOrchestrator
 {
-    private const MAX_ITERATIONS = 8;
+    private const MAX_ITERATIONS = 4;
 
     private string $apiUrl;
     private string $model;
@@ -44,13 +44,14 @@ class AgentOrchestrator
             $messages = $this->buildInitialMessages($bot);
             $this->storeMessages($conversation, $messages);
 
-            $summary = $this->runAgentLoop($conversation, $bot, $messages);
+            $result = $this->runAgentLoop($conversation, $bot, $messages);
 
             $durationMs = (int) ((microtime(true) - $startTime) * 1000);
 
             $conversation->update([
                 'status' => 'completed',
-                'summary' => $summary,
+                'summary' => $result['summary'],
+                'analysis' => $result['analysis'] ?? null,
                 'total_tokens' => $this->totalTokens,
                 'total_tool_calls' => $this->totalToolCalls,
                 'total_messages' => $conversation->messages()->count(),
@@ -86,8 +87,11 @@ class AgentOrchestrator
 
     private function buildInitialMessages(Bot $bot): array
     {
-        $systemPrompt = $this->buildSystemPrompt();
-        $userPrompt = $this->buildUserPrompt($bot);
+        $systemPrompt = $bot->ai_system_prompt ?: $this->defaultSystemPrompt();
+        $userPrompt = $this->interpolateUserPrompt(
+            $bot->ai_user_prompt ?: static::defaultUserPrompt(),
+            $bot,
+        );
 
         return [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -95,53 +99,41 @@ class AgentOrchestrator
         ];
     }
 
-    private function buildSystemPrompt(): string
+    public static function defaultSystemPrompt(): string
     {
         return <<<'PROMPT'
-You are an expert crypto grid trading advisor acting as a human supervisor for an automated trading bot. You are called periodically to review the bot's state, analyze market conditions, and take corrective actions if needed.
+Grid trading bot advisor. Review bot state, analyze market, take action if needed.
 
-## YOUR ROLE
-- You simulate an experienced human trader checking on the bot
-- You must gather information FIRST, analyze it, then decide on actions
-- You have access to tools that let you inspect AND modify the bot's configuration
-- Be conservative: only take action when there's a clear reason
-- Destructive actions (stop_bot, cancel_all_orders, close_position) require strong justification
-
-## WORKFLOW
-1. ALWAYS start by calling `get_bot_status` and `get_market_data` to understand the current situation
-2. If needed, call `get_open_orders`, `get_filled_orders`, or `get_binance_position` for deeper analysis
-3. Evaluate if the grid range is still appropriate for current market conditions
-4. Check if stop-loss and take-profit are properly set
-5. Take corrective actions if needed (set SL/TP, etc.)
-6. ALWAYS finish by calling `done` with a comprehensive summary
-
-## DECISION CRITERIA
-- If price is near grid boundary (within 1-2 grid steps): consider setting or tightening SL/TP
-- If RSI > 70 and price near upper grid: consider setting TP if not set
-- If RSI < 30 and price near lower grid: consider tightening SL
-- If unrealized PNL is very negative: evaluate whether to close position
-- If price has moved outside grid range: this is critical, consider stopping
-- If everything looks normal: confirm and set/update SL/TP as safety nets
-
-## IMPORTANT
-- You MUST call at least `get_bot_status` and `get_market_data` before making any decisions
-- You MUST call `done` when finished to provide your summary
-- Never take destructive actions without checking the full picture first
-- All prices are in USDT
+Rules:
+- Call get_bot_status + get_market_data first. Only call other tools if something looks off.
+- Be conservative: act only with clear reason. Destructive actions need strong justification.
+- Do NOT set SL/TP if already set at the same price. Only call set_stop_loss/set_take_profit when changing to a NEW value.
+- Set/adjust SL/TP if: price near grid edge, RSI extreme (>70/<30), or negative unrealized PNL.
+- If price outside grid range: critical, consider stopping.
+- Call done when finished. In "analysis": write a human-readable market assessment in Spanish (2-3 sentences max explaining what you see and why you acted or not). In "summary": 1 short sentence. All prices USDT.
 PROMPT;
     }
 
-    private function buildUserPrompt(Bot $bot): string
+    public static function defaultUserPrompt(): string
     {
-        $now = now()->toDateTimeString();
-        return "It is {$now} UTC. You are reviewing Bot #{$bot->id} ({$bot->symbol}). " .
-               "Please perform your routine check: gather data, analyze conditions, take any necessary actions, " .
-               "and provide your assessment. Start by checking the bot status and market data.";
+        return "Review Bot #{bot_id} ({symbol}) at {now} UTC. " .
+               "Call get_bot_status and get_market_data. Only call other tools if something looks abnormal. " .
+               "Then call done with a brief summary.";
     }
 
-    private function runAgentLoop(AiConversation $conversation, Bot $bot, array &$messages): string
+    private function interpolateUserPrompt(string $template, Bot $bot): string
     {
-        $summary = 'Agent did not complete analysis';
+        $now = now()->format('M j H:i');
+        return str_replace(
+            ['{bot_id}', '{symbol}', '{now}'],
+            [$bot->id, $bot->symbol, $now],
+            $template,
+        );
+    }
+
+    private function runAgentLoop(AiConversation $conversation, Bot $bot, array &$messages): array
+    {
+        $output = ['summary' => 'Agent did not complete analysis', 'analysis' => null];
 
         for ($i = 0; $i < self::MAX_ITERATIONS; $i++) {
             $response = $this->callLlm($messages);
@@ -157,7 +149,6 @@ PROMPT;
 
             $messages[] = $assistantMessage;
 
-            // Store assistant message
             AiConversationMessage::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
@@ -166,39 +157,35 @@ PROMPT;
                 'tokens' => $tokens,
             ]);
 
-            // Check if the assistant wants to call tools
             if (!empty($assistantMessage['tool_calls'])) {
                 $toolCallResults = $this->executeToolCalls($conversation, $bot, $assistantMessage['tool_calls']);
 
-                // Check if "done" was called
                 foreach ($toolCallResults as $result) {
                     if ($result['tool_name'] === 'done') {
-                        $summary = $result['result']['summary'] ?? 'Analysis complete';
-                        return $summary;
+                        $args = $result['tool_args'] ?? [];
+                        $output['summary'] = $args['summary'] ?? 'Analysis complete';
+                        $output['analysis'] = $args['analysis'] ?? null;
+                        return $output;
                     }
                 }
 
-                // Add tool results to messages for the next LLM call
                 foreach ($toolCallResults as $result) {
-                    $toolMessage = [
+                    $messages[] = [
                         'role' => 'tool',
                         'tool_call_id' => $result['tool_call_id'],
                         'name' => $result['tool_name'],
                         'content' => json_encode($result['result']),
                     ];
-                    $messages[] = $toolMessage;
                 }
             } else {
-                // No tool calls - assistant provided a text response
-                // This shouldn't happen in a well-behaved agent, but handle gracefully
                 if (!empty($assistantMessage['content'])) {
-                    $summary = $assistantMessage['content'];
+                    $output['summary'] = $assistantMessage['content'];
                 }
                 break;
             }
         }
 
-        return $summary;
+        return $output;
     }
 
     private function executeToolCalls(AiConversation $conversation, Bot $bot, array $toolCalls): array
@@ -233,6 +220,7 @@ PROMPT;
             $results[] = [
                 'tool_call_id' => $toolCallId,
                 'tool_name' => $toolName,
+                'tool_args' => $toolArgs,
                 'result' => $result,
             ];
         }
@@ -251,8 +239,8 @@ PROMPT;
                 'messages' => $apiMessages,
                 'tools' => $this->toolkit->getToolDefinitions(),
                 'tool_choice' => 'auto',
-                'temperature' => 0.2,
-                'max_tokens' => 1024,
+                'temperature' => 0.1,
+                'max_tokens' => 512,
             ];
 
             $response = Http::withHeaders([
@@ -275,8 +263,14 @@ PROMPT;
                 return null;
             }
 
+            // Strip thinking tags from assistant content
+            $msg = $choice['message'];
+            if (!empty($msg['content'])) {
+                $msg['content'] = trim(preg_replace('/<think>.*?(<\/think>|$)/s', '', $msg['content']));
+            }
+
             return [
-                'message' => $choice['message'],
+                'message' => $msg,
                 'tokens' => $data['usage']['total_tokens'] ?? 0,
                 'finish_reason' => $choice['finish_reason'] ?? null,
             ];
