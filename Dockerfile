@@ -2,7 +2,7 @@
 FROM node:20-alpine AS node-builder
 WORKDIR /build
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --legacy-peer-deps
 COPY vite.config.js tailwind.config.js postcss.config.js tsconfig.json ./
 COPY resources ./resources
 RUN npm run build
