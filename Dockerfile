@@ -1,57 +1,72 @@
-# ── Stage 1: Frontend assets ──────────────────────────────────────────
-FROM node:20-alpine AS node-builder
-WORKDIR /build
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts --legacy-peer-deps
-COPY vite.config.js tailwind.config.js postcss.config.js tsconfig.json ./
-COPY resources ./resources
-RUN npm run build
+# ── Stage 1: Base image with PHP extensions + Node + Composer ─────────
+FROM php:8.2-fpm AS base
 
-# ── Stage 2: PHP dependencies ────────────────────────────────────────
-FROM composer:2 AS composer-builder
-WORKDIR /build
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
-COPY . .
-RUN composer dump-autoload --optimize --no-dev
+RUN apt-get update && apt-get install -y \
+        git curl zip unzip \
+        nginx supervisor \
+        libpng-dev libonig-dev libxml2-dev \
+        libzip-dev libpq-dev \
+        libjpeg62-turbo-dev libfreetype6-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# ── Stage 3: Production image ────────────────────────────────────────
-FROM php:8.2-fpm-alpine
-
-RUN apk add --no-cache \
-        nginx \
-        supervisor \
-        postgresql-dev \
-        libpng-dev \
-        libjpeg-turbo-dev \
-        freetype-dev \
-        libzip-dev \
-        oniguruma-dev \
-        curl \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-        pdo_pgsql pgsql gd bcmath mbstring zip opcache pcntl \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && rm -rf /tmp/pear
+        pdo_pgsql pgsql gd bcmath mbstring zip opcache pcntl exif
 
-COPY docker/php.ini        /usr/local/etc/php/conf.d/zz-custom.ini
-COPY docker/nginx.conf     /etc/nginx/http.d/default.conf
-COPY docker/supervisord.conf /etc/supervisord.conf
-COPY docker/entrypoint.sh  /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN pecl install redis && docker-php-ext-enable redis
+
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── Stage 2: Dependencies ─────────────────────────────────────────────
+FROM base AS dependencies
 
 WORKDIR /var/www/html
 
-COPY --from=composer-builder /build/vendor ./vendor
-COPY . .
-COPY --from=node-builder /build/public/build ./public/build
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
 
-RUN chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache \
-    && rm -rf node_modules tests .env .env.* docker-compose.yml
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
+
+# ── Stage 3: Build ────────────────────────────────────────────────────
+FROM dependencies AS build
+
+COPY . .
+
+RUN composer dump-autoload --optimize --no-dev
+
+RUN npm run build
+
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html/storage
+
+# ── Stage 4: Production ───────────────────────────────────────────────
+FROM base AS production
+
+WORKDIR /var/www/html
+
+COPY --from=build /var/www/html /var/www/html
+
+COPY docker/php.ini          /usr/local/etc/php/conf.d/zz-custom.ini
+COPY docker/nginx.conf       /etc/nginx/sites-available/default
+COPY docker/supervisord.conf /etc/supervisord.conf
+COPY docker/entrypoint.sh    /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+RUN mkdir -p /run/php
 
 EXPOSE 80
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+
+# ── Service targets ───────────────────────────────────────────────────
+FROM production AS web
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+
+FROM production AS horizon
+CMD ["php", "artisan", "horizon"]
