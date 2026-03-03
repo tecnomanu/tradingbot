@@ -17,7 +17,7 @@ x-app: &app-base
     - LOG_STACK=single
     - LOG_LEVEL=${LOG_LEVEL:-warning}
     - DB_CONNECTION=${DB_CONNECTION:-pgsql}
-    - DB_HOST=${DB_HOST}
+    - DB_HOST=${DB_HOST:-tradingbot-postgres}
     - DB_PORT=${DB_PORT:-5432}
     - DB_DATABASE=${DB_DATABASE}
     - DB_USERNAME=${DB_USERNAME}
