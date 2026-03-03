@@ -1,19 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 cd /var/www/html
 
-if [ ! -f storage/app/.gitkeep ]; then
-    mkdir -p storage/app/public \
-             storage/framework/cache/data \
-             storage/framework/sessions \
-             storage/framework/views \
-             storage/logs
-fi
+mkdir -p storage/app/public \
+         storage/framework/cache/data \
+         storage/framework/sessions \
+         storage/framework/views \
+         storage/logs
 
-chown -R www-data:www-data storage bootstrap/cache
-
-# Run migrations on first boot (idempotent)
 php artisan migrate --force --no-interaction
 php artisan config:cache
 php artisan route:cache

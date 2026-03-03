@@ -4,7 +4,7 @@ x-app: &app-base
   build:
     context: .
     dockerfile: Dockerfile
-    target: production
+    target: web
   volumes:
     - app-storage:/var/www/html/storage
   environment:

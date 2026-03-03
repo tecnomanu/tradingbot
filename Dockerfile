@@ -1,9 +1,8 @@
-# ── Stage 1: Base image with PHP extensions + Node + Composer ─────────
-FROM php:8.4-fpm AS base
+# ── Stage 1: Base image with all PHP extensions ───────────────────────
+FROM php:8.4-cli AS base
 
 RUN apt-get update && apt-get install -y \
         git curl zip unzip \
-        nginx supervisor \
         libpng-dev libonig-dev libxml2-dev \
         libzip-dev libpq-dev \
         libjpeg62-turbo-dev libfreetype6-dev \
@@ -27,7 +26,7 @@ FROM base AS dependencies
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 
 COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps
@@ -51,22 +50,17 @@ WORKDIR /var/www/html
 
 COPY --from=build /var/www/html /var/www/html
 
-COPY docker/php.ini          /usr/local/etc/php/conf.d/zz-custom.ini
-COPY docker/nginx.conf       /etc/nginx/sites-available/default
-COPY docker/supervisord.conf /etc/supervisord.conf
-COPY docker/entrypoint.sh    /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-RUN mkdir -p /run/php
-
-EXPOSE 80
+EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
 
 # ── Service targets ───────────────────────────────────────────────────
 FROM production AS web
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
 
 FROM production AS horizon
 CMD ["php", "artisan", "horizon"]
