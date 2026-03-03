@@ -1,5 +1,5 @@
 # ── Stage 1: Base image with PHP extensions + Node + Composer ─────────
-FROM php:8.2-fpm AS base
+FROM php:8.4-fpm AS base
 
 RUN apt-get update && apt-get install -y \
         git curl zip unzip \
