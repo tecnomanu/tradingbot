@@ -3,6 +3,8 @@ x-app: &app-base
     context: .
     dockerfile: Dockerfile
     target: web
+  ports:
+    - "${EXTERNAL_PORT:-8100}:80"
   volumes:
     - app-storage:/var/www/html/storage
   environment:
