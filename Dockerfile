@@ -6,11 +6,12 @@ RUN apt-get update && apt-get install -y \
         libpng-dev libonig-dev libxml2-dev \
         libzip-dev libpq-dev \
         libjpeg62-turbo-dev libfreetype6-dev \
+        default-mysql-client \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-        pdo_pgsql pgsql gd bcmath mbstring zip opcache pcntl exif
+        pdo_mysql pdo_pgsql pgsql gd bcmath mbstring zip opcache pcntl exif
 
 RUN pecl install redis && docker-php-ext-enable redis
 
