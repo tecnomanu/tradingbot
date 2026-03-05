@@ -41,6 +41,8 @@ x-app: &app-base
 services:
   tradingbot-app:
     <<: *app-base
+    environment:
+      - CONTAINER_ROLE=app
     ports:
       - "${EXTERNAL_PORT:-8100}:8000"
     labels:
@@ -75,6 +77,7 @@ services:
       - AI_URL=${AI_URL}
       - AI_MODEL=${AI_MODEL}
       - AI_API_KEY=${AI_API_KEY}
+      - CONTAINER_ROLE=horizon
     restart: always
 
 volumes:
