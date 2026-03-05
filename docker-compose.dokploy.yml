@@ -3,8 +3,6 @@ x-app: &app-base
     context: .
     dockerfile: Dockerfile
     target: web
-  ports:
-    - "${EXTERNAL_PORT:-8100}:80"
   volumes:
     - app-storage:/var/www/html/storage
   environment:
@@ -19,7 +17,7 @@ x-app: &app-base
     - LOG_STACK=single
     - LOG_LEVEL=${LOG_LEVEL:-warning}
     - DB_CONNECTION=${DB_CONNECTION:-pgsql}
-    - DB_HOST=${DB_HOST:-tradingbot-postgres}
+    - DB_HOST=${DB_HOST}
     - DB_PORT=${DB_PORT:-5432}
     - DB_DATABASE=${DB_DATABASE}
     - DB_USERNAME=${DB_USERNAME}
@@ -43,6 +41,13 @@ x-app: &app-base
 services:
   tradingbot-app:
     <<: *app-base
+    ports:
+      - "${EXTERNAL_PORT:-8100}:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tradingbot-app.rule=Host(`${TRAEFIK_DOMAIN:-tradingbot.localhost}`)"
+      - "traefik.http.routers.tradingbot-app.entrypoints=web"
+      - "traefik.http.services.tradingbot-app.loadbalancer.server.port=8000"
 
   tradingbot-horizon:
     build:
