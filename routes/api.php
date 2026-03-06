@@ -1,0 +1,42 @@
+<?php
+
+use App\Http\Controllers\Api\BotApiController;
+use App\Http\Controllers\Api\OrderApiController;
+use App\Http\Controllers\Api\StatusApiController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| External API Routes – protected by API key
+|--------------------------------------------------------------------------
+| Auth: X-API-Key: <key>  OR  Authorization: Bearer <key>
+| Base URL: /api/v1/
+*/
+
+Route::prefix('v1')->middleware('api.key')->group(function () {
+
+    // ------------------------------------------------------------------
+    // Status / overview
+    // ------------------------------------------------------------------
+    Route::get('status', [StatusApiController::class, 'overview']);
+
+    // ------------------------------------------------------------------
+    // Bots
+    // ------------------------------------------------------------------
+    Route::prefix('bots')->group(function () {
+        Route::get('/',          [BotApiController::class, 'index']);   // list all
+        Route::get('/{bot}',     [BotApiController::class, 'show']);    // full detail
+        Route::patch('/{bot}',   [BotApiController::class, 'update']);  // update config
+        Route::post('/{bot}/start', [BotApiController::class, 'start']); // start bot
+        Route::post('/{bot}/stop',  [BotApiController::class, 'stop']);  // stop bot
+    });
+
+    // ------------------------------------------------------------------
+    // Orders
+    // ------------------------------------------------------------------
+    Route::prefix('orders')->group(function () {
+        Route::get('/',              [OrderApiController::class, 'global']);  // all orders
+        Route::get('/bot/{bot}',     [OrderApiController::class, 'byBot']);   // orders for bot
+        Route::get('/bot/{bot}/stats', [OrderApiController::class, 'stats']); // stats for bot
+    });
+});

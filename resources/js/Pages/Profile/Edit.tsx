@@ -2,15 +2,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
 import { Head } from "@inertiajs/react";
-import { KeyRound, Trash2, User } from "lucide-react";
+import { KeyRound, Terminal, Trash2, User } from "lucide-react";
 import DeleteUserForm from "./Partials/DeleteUserForm";
 import UpdatePasswordForm from "./Partials/UpdatePasswordForm";
 import UpdateProfileInformationForm from "./Partials/UpdateProfileInformationForm";
+import ApiKeyManager from "./Partials/ApiKeyManager";
 
 export default function Edit({
     mustVerifyEmail,
     status,
-}: PageProps<{ mustVerifyEmail: boolean; status?: string }>) {
+    apiKey,
+}: PageProps<{ mustVerifyEmail: boolean; status?: string; apiKey: string }>) {
     return (
         <AuthenticatedLayout
             header={
@@ -24,7 +26,7 @@ export default function Edit({
             <div className="py-8 text-foreground">
                 <div className="mx-auto max-w-2xl px-4 sm:px-6">
                     <Tabs defaultValue="profile" className="space-y-6">
-                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsList className="grid w-full grid-cols-4">
                             <TabsTrigger
                                 value="profile"
                                 className="flex items-center gap-2"
@@ -40,6 +42,13 @@ export default function Edit({
                                 <span className="hidden sm:inline">
                                     Contraseña
                                 </span>
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="apikey"
+                                className="flex items-center gap-2"
+                            >
+                                <Terminal className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">API Key</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="danger"
@@ -79,6 +88,19 @@ export default function Edit({
                                 </p>
                             </div>
                             <UpdatePasswordForm />
+                        </TabsContent>
+
+                        <TabsContent value="apikey" className="space-y-4">
+                            <div>
+                                <h3 className="text-lg font-semibold">
+                                    API Key Externa
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Usá esta key para conectar agentes o MCP al
+                                    bot desde afuera. Cada usuario tiene su propia key.
+                                </p>
+                            </div>
+                            <ApiKeyManager apiKey={apiKey} />
                         </TabsContent>
 
                         <TabsContent value="danger" className="space-y-4">

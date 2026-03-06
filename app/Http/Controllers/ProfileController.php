@@ -20,7 +20,8 @@ class ProfileController extends Controller
     {
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => session('status'),
+            'status'          => session('status'),
+            'apiKey'          => $request->user()->api_key,
         ]);
     }
 
@@ -38,6 +39,19 @@ class ProfileController extends Controller
         $request->user()->save();
 
         return Redirect::route('profile.edit');
+    }
+
+    /**
+     * Rotate the user's external API key and return the new one.
+     */
+    public function rotateApiKey(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $newKey = $request->user()->rotateApiKey();
+
+        return response()->json([
+            'success' => true,
+            'api_key' => $newKey,
+        ]);
     }
 
     /**
