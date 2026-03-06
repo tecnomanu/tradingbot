@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\BotApiController;
+use App\Http\Controllers\Api\MarketApiController;
 use App\Http\Controllers\Api\OrderApiController;
 use App\Http\Controllers\Api\StatusApiController;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,14 @@ Route::prefix('v1')->middleware('api.key')->group(function () {
         Route::patch('/{bot}',   [BotApiController::class, 'update']);  // update config
         Route::post('/{bot}/start', [BotApiController::class, 'start']); // start bot
         Route::post('/{bot}/stop',  [BotApiController::class, 'stop']);  // stop bot
+    });
+
+    // ------------------------------------------------------------------
+    // Market data & analysis (uses same Binance endpoints as the bot)
+    // ------------------------------------------------------------------
+    Route::prefix('market')->group(function () {
+        Route::get('/price',       [MarketApiController::class, 'price']);           // ?symbol=BTCUSDT&testnet=false
+        Route::get('/bot/{bot}',   [MarketApiController::class, 'analyze']);         // ?interval=4h&candles=24
     });
 
     // ------------------------------------------------------------------

@@ -22,5 +22,29 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Return consistent JSON for all /api/* routes
+        $exceptions->shouldRenderJsonWhen(
+            fn ($request, \Throwable $e) => $request->is('api/*')
+        );
+
+        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
+            if (!$request->is('api/*')) {
+                return null; // let default handler deal with it
+            }
+
+            $status = method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500;
+            $message = match (true) {
+                $status === 404 => 'Resource not found.',
+                $status === 403 => 'Forbidden.',
+                $status === 422 => 'Validation failed.',
+                app()->isProduction() => 'Server error.',
+                default => $e->getMessage(),
+            };
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+                'errors'  => $status === 422 && method_exists($e, 'errors') ? $e->errors() : null,
+            ], $status ?: 500);
+        });
     })->create();
