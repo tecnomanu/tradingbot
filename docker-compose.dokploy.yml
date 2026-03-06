@@ -35,6 +35,7 @@ x-app: &app-base
     - AI_URL=${AI_URL}
     - AI_MODEL=${AI_MODEL}
     - AI_API_KEY=${AI_API_KEY}
+    - CONTAINER_ROLE=app
   depends_on:
     tradingbot-mysql:
       condition: service_healthy
@@ -45,8 +46,6 @@ x-app: &app-base
 services:
   tradingbot-app:
     <<: *app-base
-    environment:
-      - CONTAINER_ROLE=app
     ports:
       - "${EXTERNAL_PORT:-8100}:8000"
     labels:
