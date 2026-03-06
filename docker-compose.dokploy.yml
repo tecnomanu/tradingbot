@@ -31,7 +31,6 @@ x-app: &app-base
     - REDIS_CLIENT=phpredis
     - REDIS_HOST=tradingbot-redis
     - REDIS_PORT=6379
-    - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
     - AI_URL=${AI_URL}
     - AI_MODEL=${AI_MODEL}
     - AI_API_KEY=${AI_API_KEY}
@@ -77,7 +76,6 @@ services:
       - REDIS_CLIENT=phpredis
       - REDIS_HOST=tradingbot-redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - AI_URL=${AI_URL}
       - AI_MODEL=${AI_MODEL}
       - AI_API_KEY=${AI_API_KEY}
