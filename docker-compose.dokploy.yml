@@ -1,53 +1,49 @@
-x-app: &app-base
-  build:
-    context: .
-    dockerfile: Dockerfile
-    target: web
-  volumes:
-    - app-storage:/var/www/html/storage
-  environment:
-    - APP_NAME=${APP_NAME:-TradingBot}
-    - APP_ENV=${APP_ENV:-production}
-    - APP_KEY=${APP_KEY}
-    - APP_DEBUG=${APP_DEBUG:-false}
-    - APP_URL=${APP_URL}
-    - PHP_CLI_SERVER_WORKERS=4
-    - BCRYPT_ROUNDS=12
-    - LOG_CHANNEL=stack
-    - LOG_STACK=single
-    - LOG_LEVEL=${LOG_LEVEL:-warning}
-    - DB_CONNECTION=mysql
-    - DB_HOST=tradingbot-mysql
-    - DB_PORT=3306
-    - DB_DATABASE=${DB_DATABASE:-tradingbot}
-    - DB_USERNAME=${DB_USERNAME:-tradingbot}
-    - DB_PASSWORD=${DB_PASSWORD}
-    - SESSION_DRIVER=database
-    - SESSION_LIFETIME=120
-    - BROADCAST_CONNECTION=log
-    - FILESYSTEM_DISK=local
-    - QUEUE_CONNECTION=redis
-    - CACHE_STORE=redis
-    - REDIS_CLIENT=phpredis
-    - REDIS_HOST=tradingbot-redis
-    - REDIS_PORT=6379
-    - REDIS_PASSWORD=${REDIS_PASSWORD}
-    - AI_URL=${AI_URL}
-    - AI_MODEL=${AI_MODEL}
-    - AI_API_KEY=${AI_API_KEY}
-    - CONTAINER_ROLE=app
-  depends_on:
-    tradingbot-mysql:
-      condition: service_healthy
-    tradingbot-redis:
-      condition: service_healthy
-  restart: always
-
 services:
   tradingbot-app:
-    <<: *app-base
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    volumes:
+      - app-storage:/var/www/html/storage
     ports:
       - "${EXTERNAL_PORT:-8100}:8000"
+    environment:
+      - CONTAINER_ROLE=app
+      - APP_NAME=${APP_NAME:-TradingBot}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL}
+      - PHP_CLI_SERVER_WORKERS=4
+      - LOG_CHANNEL=stack
+      - LOG_STACK=single
+      - LOG_LEVEL=${LOG_LEVEL:-warning}
+      - DB_CONNECTION=mysql
+      - DB_HOST=tradingbot-mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-tradingbot}
+      - DB_USERNAME=${DB_USERNAME:-tradingbot}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SESSION_DRIVER=database
+      - SESSION_LIFETIME=120
+      - QUEUE_CONNECTION=redis
+      - CACHE_STORE=redis
+      - REDIS_CLIENT=phpredis
+      - REDIS_HOST=tradingbot-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - AI_URL=${AI_URL}
+      - AI_MODEL=${AI_MODEL}
+      - AI_API_KEY=${AI_API_KEY}
+    networks:
+      - tradingbot-net
+    depends_on:
+      tradingbot-mysql:
+        condition: service_healthy
+      tradingbot-redis:
+        condition: service_healthy
+    restart: always
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tradingbot-app.rule=Host(`${TRAEFIK_DOMAIN:-tradingbot.localhost}`)"
@@ -63,8 +59,14 @@ services:
       - app-storage:/var/www/html/storage
     environment:
       - CONTAINER_ROLE=horizon
-      - APP_KEY=${APP_KEY}
+      - APP_NAME=${APP_NAME:-TradingBot}
       - APP_ENV=${APP_ENV:-production}
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL}
+      - LOG_CHANNEL=stack
+      - LOG_STACK=single
+      - LOG_LEVEL=${LOG_LEVEL:-warning}
       - DB_CONNECTION=mysql
       - DB_HOST=tradingbot-mysql
       - DB_PORT=3306
@@ -80,6 +82,8 @@ services:
       - AI_URL=${AI_URL}
       - AI_MODEL=${AI_MODEL}
       - AI_API_KEY=${AI_API_KEY}
+    networks:
+      - tradingbot-net
     depends_on:
       tradingbot-mysql:
         condition: service_healthy
@@ -97,6 +101,8 @@ services:
       - MYSQL_USER=${DB_USERNAME:-tradingbot}
       - MYSQL_PASSWORD=${DB_PASSWORD}
       - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+    networks:
+      - tradingbot-net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
       interval: 10s
@@ -106,16 +112,20 @@ services:
   tradingbot-redis:
     image: redis:alpine
     restart: always
-    command: >
-      sh -c "redis-server ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}"
+    command: sh -c "redis-server ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}"
     volumes:
       - redis-data:/data
+    networks:
+      - tradingbot-net
     healthcheck:
-      test: >
-        sh -c "redis-cli ${REDIS_PASSWORD:+-a $REDIS_PASSWORD} ping"
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  tradingbot-net:
+    driver: bridge
 
 volumes:
   app-storage:
