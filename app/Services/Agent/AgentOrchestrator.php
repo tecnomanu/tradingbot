@@ -416,13 +416,15 @@ P,
             // Build the API messages (clean format for OpenAI-compatible API)
             $apiMessages = $this->buildApiMessages($messages);
 
+            $isThinkingModel = str_contains($this->model, 'qwen') || str_contains($this->model, 'deepseek');
+
             $payload = [
                 'model' => $this->model,
                 'messages' => $apiMessages,
                 'tools' => $this->toolkit->getToolDefinitions(),
                 'tool_choice' => 'auto',
-                'temperature' => 0.2,
-                'max_tokens' => 1024,
+                'temperature' => $isThinkingModel ? 0.6 : 0.2,
+                'max_tokens' => $isThinkingModel ? 4096 : 1024,
             ];
 
             $response = Http::withHeaders([
@@ -450,14 +452,27 @@ P,
 
             // Strip thinking tags from assistant content
             $msg = $choice['message'];
+            $finishReason = $choice['finish_reason'] ?? null;
+
             if (!empty($msg['content'])) {
-                $msg['content'] = trim(preg_replace('/<think>.*?(<\/think>|$)/s', '', $msg['content']));
+                $stripped = trim(preg_replace('/<think>.*?(<\/think>|$)/s', '', $msg['content']));
+                $msg['content'] = $stripped;
+            }
+
+            // If thinking model consumed all tokens on <think> with no tools
+            // and no useful output, return null to let the loop retry or end cleanly
+            if (empty($msg['content']) && empty($msg['tool_calls']) && $finishReason !== 'tool_calls') {
+                Log::warning('AgentOrchestrator: LLM returned empty after stripping think tags', [
+                    'finish_reason' => $finishReason,
+                    'tokens' => $data['usage']['total_tokens'] ?? 0,
+                ]);
+                return null;
             }
 
             return [
                 'message' => $msg,
                 'tokens' => $data['usage']['total_tokens'] ?? 0,
-                'finish_reason' => $choice['finish_reason'] ?? null,
+                'finish_reason' => $finishReason,
             ];
         } catch (\Exception $e) {
             Log::error('AgentOrchestrator: callLlm exception', ['error' => $e->getMessage()]);
