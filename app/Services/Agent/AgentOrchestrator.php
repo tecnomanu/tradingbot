@@ -267,12 +267,19 @@ P,
         $output = ['summary' => 'Agent did not complete analysis', 'analysis' => null];
 
         for ($i = 0; $i < self::MAX_ITERATIONS; $i++) {
+            Log::info("AgentOrchestrator: iteration {$i}, messages=" . count($messages));
             $response = $this->callLlm($messages);
 
             if (!$response) {
-                Log::warning('AgentOrchestrator: LLM returned null', ['iteration' => $i]);
+                Log::warning("AgentOrchestrator: LLM returned null at iteration {$i}");
                 break;
             }
+
+            Log::info("AgentOrchestrator: iteration {$i} got response", [
+                'finish_reason' => $response['finish_reason'] ?? 'unknown',
+                'has_tool_calls' => !empty($response['message']['tool_calls']),
+                'has_content' => !empty($response['message']['content']),
+            ]);
 
             $assistantMessage = $response['message'];
             $tokens = $response['tokens'] ?? 0;
@@ -408,8 +415,10 @@ P,
             if (!$response->successful()) {
                 Log::error('AgentOrchestrator: LLM API error', [
                     'status' => $response->status(),
-                    'body' => substr($response->body(), 0, 500),
+                    'body' => substr($response->body(), 0, 1000),
+                    'message_count' => count($apiMessages),
                 ]);
+                logger()->error("LLM API error: status={$response->status()} body=" . substr($response->body(), 0, 500));
                 return null;
             }
 
@@ -417,6 +426,7 @@ P,
             $choice = $data['choices'][0] ?? null;
 
             if (!$choice) {
+                logger()->error('LLM no choice in response: ' . substr(json_encode($data), 0, 500));
                 return null;
             }
 
