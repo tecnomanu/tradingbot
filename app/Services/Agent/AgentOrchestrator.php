@@ -305,9 +305,8 @@ P,
                 );
                 $hasDone = collect($allCalls)->contains(fn($tc) => ($tc['function']['name'] ?? '') === 'done');
 
-                // If done is batched with action tools, defer done so the LLM
-                // can write a coherent analysis after seeing action results.
-                $callsToExecute = ($hasActions && $hasDone)
+                $doneDeferred = ($hasActions && $hasDone);
+                $callsToExecute = $doneDeferred
                     ? array_values(array_filter($allCalls, fn($tc) => ($tc['function']['name'] ?? '') !== 'done'))
                     : $allCalls;
 
@@ -331,11 +330,13 @@ P,
                     ];
                 }
 
-                // If we deferred done, add a synthetic tool response for it
-                // and prompt the LLM to finalize with a coherent analysis
-                if ($hasActions && $hasDone) {
+                if ($doneDeferred) {
                     $doneCall = collect($allCalls)->first(fn($tc) => ($tc['function']['name'] ?? '') === 'done');
                     if ($doneCall) {
+                        $doneArgs = json_decode($doneCall['function']['arguments'] ?? '{}', true) ?: [];
+                        $deferredAnalysis = $doneArgs['analysis'] ?? null;
+                        $deferredSummary = $doneArgs['summary'] ?? null;
+
                         $messages[] = [
                             'role' => 'tool',
                             'tool_call_id' => $doneCall['id'] ?? uniqid('tc_'),
@@ -356,14 +357,19 @@ P,
             }
         }
 
-        // If loop ended without done(), try to extract analysis from last assistant message
         if ($output['analysis'] === null) {
+            // Try last assistant text first
             $lastAssistant = collect($messages)
                 ->filter(fn($m) => ($m['role'] ?? '') === 'assistant' && !empty($m['content']))
                 ->last();
             if ($lastAssistant) {
                 $output['analysis'] = $lastAssistant['content'];
                 $output['summary'] = mb_substr($lastAssistant['content'], 0, 200);
+            }
+            // Fall back to the deferred done() analysis if available
+            elseif (!empty($deferredAnalysis ?? null)) {
+                $output['analysis'] = $deferredAnalysis;
+                $output['summary'] = $deferredSummary ?? mb_substr($deferredAnalysis, 0, 200);
             }
         }
 
