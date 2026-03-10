@@ -1014,32 +1014,94 @@ export default function Show({
     );
 }
 
-const DEFAULT_SYSTEM_PROMPT = `Grid trading bot advisor. Review bot state, analyze market, take action if needed.
+const PERSONALITY_PRESETS: Record<string, { label: string; description: string; prompt: string }> = {
+    conservative: {
+        label: "Conservador",
+        description: "Prioriza preservar capital. Solo actúa con evidencia técnica contundente.",
+        prompt: `You are a cautious crypto grid trading bot supervisor. Capital preservation is your top priority.
 
-Rules:
-- Call get_bot_status + get_market_data first. Only call other tools if something looks off.
-- Be conservative: act only with clear reason. Destructive actions need strong justification.
-- Do NOT set SL/TP if already set at the same price. Only call set_stop_loss/set_take_profit when changing to a NEW value.
-- Set/adjust SL/TP if: price near grid edge, RSI extreme (>70/<30), or negative unrealized PNL.
-- If price outside grid range: critical, consider stopping.
-- Call done when finished. In "analysis": write a human-readable market assessment in Spanish (2-3 sentences max explaining what you see and why you acted or not). In "summary": 1 short sentence. All prices USDT.`;
+## TRADING STYLE: Conservative
+- Only act when there is overwhelming technical evidence (multiple confirming indicators).
+- Keep SL tight to protect capital; accept missing some upside.
+- Do NOT adjust the grid unless price has been outside the range for multiple consecutive checks.
+- Prefer to let the grid work passively. Avoid frequent changes.
+- Only use adjust_grid in extreme cases when the grid is clearly misaligned for an extended period.
+- When RSI > 80 or < 20, tighten SL/TP but don't rush to close positions.`,
+    },
+    moderate: {
+        label: "Moderado",
+        description: "Balance entre protección y optimización. Interviene cuando los indicadores lo justifican.",
+        prompt: `You are an expert crypto grid trading bot supervisor. Your approach is balanced and methodical.
 
-const DEFAULT_USER_PROMPT = `Review Bot #{bot_id} ({symbol}) at {now} UTC. Call get_bot_status and get_market_data. Only call other tools if something looks abnormal. Then call done with a brief summary.`;
+## TRADING STYLE: Moderate
+- Act when indicators clearly warrant it, but don't over-optimize.
+- Prefer stability: only adjust SL/TP or grid when there's a clear technical reason.
+- Tolerate normal market fluctuations within the grid range.
+- Intervene proactively only when RSI is extreme (>75 or <25) or price is within 2% of grid edges.
+- When in doubt, observe and report rather than act.`,
+    },
+    aggressive: {
+        label: "Agresivo",
+        description: "Maximiza profit activamente. Ajusta grid y SL/TP frecuentemente siguiendo tendencia.",
+        prompt: `You are an aggressive crypto grid trading bot supervisor. You maximize profit by actively managing the bot.
+
+## TRADING STYLE: Aggressive
+- Proactively adjust grid ranges to follow price trends and capture maximum profit.
+- Use adjust_grid when price is in the top 15% or bottom 15% of the current grid range. Calculate: position% = (price - lower) / (upper - lower) * 100. Act when position% > 85 or position% < 15.
+- When adjusting grid, recenter it around current price with the same range width, shifted in the direction of the trend.
+- Set tight SL to protect gains, but set wide TP to capture momentum.
+- When RSI > 60 AND MACD is positive (bullish confluence), shift grid higher. When RSI < 40 AND MACD is negative, shift grid lower.
+- Monitor Bollinger bands: price near upper band = widen TP, price near lower band = tighten SL.
+- When the trend is clearly bullish (SMA20 > SMA50, positive MACD, RSI 50-70), actively widen the grid upward.
+- When the trend is bearish, narrow the grid and tighten protections immediately.
+- If price is between 15%-85% of grid range AND RSI is between 40-60 (neutral zone), DO NOT adjust the grid. Report status only.
+- Every action must be justified with specific numbers. Never act "just because" or to optimize prematurely.`,
+    },
+};
+
+const DEFAULT_USER_PROMPT = `Scheduled check for Bot #{bot_id} ({symbol}) at {now} UTC. Start by calling get_bot_status and get_market_data simultaneously. Analyze the market conditions, bot performance, and grid positioning. Take protective or optimization actions if warranted. Always finish with done() including a detailed analysis in Spanish explaining what you found and why you acted (or didn't).`;
+
+function detectPreset(prompt: string | null): string {
+    if (!prompt) return "moderate";
+    const lower = prompt.toLowerCase();
+    if (lower.includes("aggressive") || lower.includes("agresivo")) return "aggressive";
+    if (lower.includes("cautious") || lower.includes("conservative") || lower.includes("conservador")) return "conservative";
+    if (lower.includes("moderate") || lower.includes("moderado") || lower.includes("balanced")) return "moderate";
+    return "custom";
+}
 
 function AiPromptConfig({ bot }: { bot: Bot }) {
-    const [systemPrompt, setSystemPrompt] = useState(bot.ai_system_prompt ?? "");
+    const detectedPreset = detectPreset(bot.ai_system_prompt);
+    const [activePreset, setActivePreset] = useState(detectedPreset);
+    const [customPrompt, setCustomPrompt] = useState(bot.ai_system_prompt ?? "");
     const [userPrompt, setUserPrompt] = useState(bot.ai_user_prompt ?? "");
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [review, setReview] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
+    const [showCustom, setShowCustom] = useState(detectedPreset === "custom");
+
+    const currentPrompt = showCustom
+        ? customPrompt
+        : (PERSONALITY_PRESETS[activePreset]?.prompt ?? PERSONALITY_PRESETS.moderate.prompt);
+
+    const handlePresetChange = (preset: string) => {
+        setActivePreset(preset);
+        if (preset !== "custom") {
+            setShowCustom(false);
+            setCustomPrompt(PERSONALITY_PRESETS[preset]?.prompt ?? "");
+        } else {
+            setShowCustom(true);
+        }
+        setSaved(false);
+    };
 
     const handleSave = () => {
         setSaving(true);
         setSaved(false);
         router.put(
             `/ai-agent/bots/${bot.id}/prompts`,
-            { ai_system_prompt: systemPrompt, ai_user_prompt: userPrompt },
+            { ai_system_prompt: currentPrompt, ai_user_prompt: userPrompt || null },
             {
                 preserveScroll: true,
                 onSuccess: () => setSaved(true),
@@ -1059,7 +1121,7 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                     "X-CSRF-TOKEN": document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
                 },
                 body: JSON.stringify({
-                    ai_system_prompt: systemPrompt || null,
+                    ai_system_prompt: currentPrompt || null,
                     ai_user_prompt: userPrompt || null,
                 }),
             });
@@ -1072,54 +1134,88 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
         }
     };
 
-    const handleReset = () => {
-        setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
-        setUserPrompt(DEFAULT_USER_PROMPT);
-        setSaved(false);
-    };
-
     return (
         <div className="space-y-4">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Brain className="h-5 w-5" />
-                        Configuración del AI Agent
+                        Personalidad del Agente
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                        Personalizá el comportamiento del agente para este bot.
-                        Dejá vacío para usar la configuración por defecto.
-                        Variables disponibles en el primer mensaje: <code className="text-xs bg-muted px-1 rounded">{"{bot_id}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{symbol}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{now}"}</code>
+                        Elegí el estilo de trading del agente AI. Las reglas operativas (workflow, tools, formato) son fijas y no se muestran.
                     </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="system-prompt">System Prompt</Label>
-                        <Textarea
-                            id="system-prompt"
-                            value={systemPrompt}
-                            onChange={(e) => { setSystemPrompt(e.target.value); setSaved(false); }}
-                            placeholder={DEFAULT_SYSTEM_PROMPT}
-                            rows={10}
-                            className="font-mono text-sm"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Define las reglas, personalidad y estrategia del agente. Ej: más agresivo, priorizar RSI+SMA, etc.
-                        </p>
+                    <div className="space-y-3">
+                        <Label>Estilo de Trading</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {Object.entries(PERSONALITY_PRESETS).map(([key, preset]) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => handlePresetChange(key)}
+                                    className={`text-left p-3 rounded-lg border-2 transition-all ${
+                                        activePreset === key && !showCustom
+                                            ? "border-primary bg-primary/10"
+                                            : "border-border hover:border-primary/50"
+                                    }`}
+                                >
+                                    <div className="font-medium text-sm">{preset.label}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{preset.description}</div>
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => handlePresetChange("custom")}
+                            className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                                showCustom
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50"
+                            }`}
+                        >
+                            <div className="font-medium text-sm">Personalizado</div>
+                            <div className="text-xs text-muted-foreground mt-1">Escribí tu propia personalidad y reglas de trading.</div>
+                        </button>
                     </div>
 
+                    {showCustom && (
+                        <div className="space-y-2">
+                            <Label htmlFor="custom-prompt">Personalidad personalizada</Label>
+                            <Textarea
+                                id="custom-prompt"
+                                value={customPrompt}
+                                onChange={(e) => { setCustomPrompt(e.target.value); setSaved(false); }}
+                                placeholder="You are a crypto grid trading bot supervisor..."
+                                rows={8}
+                                className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Definí la personalidad, estilo y criterios de decisión. Las instrucciones de workflow y tools se agregan automáticamente.
+                            </p>
+                        </div>
+                    )}
+
+                    {!showCustom && (
+                        <div className="rounded-lg bg-muted/50 p-3">
+                            <p className="text-xs text-muted-foreground mb-2 font-medium">Vista previa del estilo activo:</p>
+                            <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{currentPrompt}</pre>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
-                        <Label htmlFor="user-prompt">Primer Mensaje</Label>
+                        <Label htmlFor="user-prompt">Mensaje Inicial</Label>
                         <Textarea
                             id="user-prompt"
                             value={userPrompt}
                             onChange={(e) => { setUserPrompt(e.target.value); setSaved(false); }}
                             placeholder={DEFAULT_USER_PROMPT}
-                            rows={4}
+                            rows={3}
                             className="font-mono text-sm"
                         />
                         <p className="text-xs text-muted-foreground">
-                            El mensaje inicial que recibe el agente en cada consulta.
+                            El mensaje que recibe el agente en cada consulta. Variables: <code className="text-xs bg-muted px-1 rounded">{"{bot_id}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{symbol}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{now}"}</code>
                         </p>
                     </div>
 
@@ -1131,9 +1227,6 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                         <Button onClick={handleTest} disabled={testing} variant="secondary" className="gap-1.5">
                             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
                             {testing ? "Analizando..." : "Test con IA"}
-                        </Button>
-                        <Button onClick={handleReset} variant="ghost" className="text-muted-foreground">
-                            Restaurar por defecto
                         </Button>
                         {saved && (
                             <span className="flex items-center gap-1 text-sm text-emerald-400">

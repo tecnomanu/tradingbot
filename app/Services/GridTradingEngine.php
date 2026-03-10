@@ -511,4 +511,95 @@ class GridTradingEngine
 
         Log::info('GridEngine: bot stopped', ['bot_id' => $bot->id]);
     }
+
+    /**
+     * Reinitialize grid orders for an active bot after range adjustment.
+     * Recalculates grid levels, creates new DB orders, and places them on Binance.
+     */
+    public function reinitializeGrid(Bot $bot): void
+    {
+        $account = $bot->binanceAccount;
+        if (!$account) {
+            throw new Exception('No Binance account linked');
+        }
+
+        $gridConfig = $this->gridCalculator->calculateFullGridConfig([
+            'price_lower' => $bot->price_lower,
+            'price_upper' => $bot->price_upper,
+            'grid_count' => $bot->grid_count,
+            'investment' => $bot->investment,
+            'leverage' => $bot->leverage,
+            'side' => $bot->side->value,
+        ]);
+
+        $bot->update([
+            'profit_per_grid' => $gridConfig['profit_per_grid'],
+            'commission_per_grid' => $gridConfig['commission_per_grid'],
+        ]);
+
+        $now = now();
+        $gridLevels = $gridConfig['grid_levels'];
+        $quantity = $gridConfig['quantity_per_grid'];
+        $orders = [];
+
+        $currentPrice = $this->binance->getCurrentPrice($account, $bot->symbol);
+        if (!$currentPrice) {
+            throw new Exception("Cannot get current price for {$bot->symbol}");
+        }
+
+        foreach ($gridLevels as $level => $price) {
+            $side = $price < $currentPrice ? OrderSide::Buy : OrderSide::Sell;
+            $orders[] = [
+                'bot_id' => $bot->id,
+                'side' => $side->value,
+                'status' => OrderStatus::Open->value,
+                'price' => $price,
+                'quantity' => $quantity,
+                'grid_level' => $level,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        $this->orderRepository->createMany($orders);
+
+        $newOrders = $bot->orders()->where('status', OrderStatus::Open)->where('created_at', '>=', $now)->orderBy('price')->get();
+        $placedCount = 0;
+
+        foreach ($newOrders as $order) {
+            $binanceSide = $order->side === OrderSide::Buy ? 'BUY' : 'SELL';
+            $qty = $this->binance->formatQuantity($bot->symbol, $order->quantity);
+            $formattedPrice = $this->binance->formatPrice($bot->symbol, $order->price);
+
+            if ($qty <= 0) {
+                continue;
+            }
+
+            try {
+                $clientOrderId = "grid_{$bot->id}_{$order->grid_level}";
+                $result = $this->binance->placeLimitOrder($account, $bot->symbol, $binanceSide, $qty, $formattedPrice, $clientOrderId);
+
+                $order->update([
+                    'binance_order_id' => (string) $result['orderId'],
+                    'status' => OrderStatus::Open,
+                    'quantity' => $qty,
+                    'price' => $formattedPrice,
+                ]);
+                $placedCount++;
+            } catch (Exception $e) {
+                Log::error('GridEngine: failed to place adjusted grid order', [
+                    'bot_id' => $bot->id,
+                    'grid_level' => $order->grid_level,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('GridEngine: grid reinitialized', [
+            'bot_id' => $bot->id,
+            'range' => "{$bot->price_lower}-{$bot->price_upper}",
+            'placed' => $placedCount,
+            'total' => $newOrders->count(),
+        ]);
+    }
 }

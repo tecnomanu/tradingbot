@@ -142,7 +142,8 @@ class AiAgentController extends Controller
             'ai_user_prompt' => 'nullable|string|max:2000',
         ]);
 
-        $systemPrompt = $data['ai_system_prompt'] ?: AgentOrchestrator::defaultSystemPrompt();
+        $personality = $data['ai_system_prompt'] ?: AgentOrchestrator::defaultPersonality();
+        $systemPrompt = $personality . "\n\n" . AgentOrchestrator::operationalPrompt();
         $userPrompt = $data['ai_user_prompt'] ?: AgentOrchestrator::defaultUserPrompt();
 
         $reviewPrompt = <<<REVIEW

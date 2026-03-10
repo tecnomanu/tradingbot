@@ -7,6 +7,7 @@ use App\Models\BotActionLog;
 use App\Services\AiTradingAgent;
 use App\Services\BinanceApiService;
 use App\Services\BinanceFuturesService;
+use App\Services\BotService;
 use App\Services\GridTradingEngine;
 use App\Support\BotLog as Log;
 
@@ -19,6 +20,7 @@ class AgentToolkit
         private BinanceApiService $binanceApi,
         private BinanceFuturesService $binanceFutures,
         private AiTradingAgent $aiAgent,
+        private BotService $botService,
     ) {}
 
     public function setConversationId(int $id): void
@@ -58,16 +60,21 @@ class AgentToolkit
             $this->tool('cancel_all_orders', 'Cancel ALL open orders. Destructive.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('stop_bot', 'Stop bot entirely. IRREVERSIBLE.', [
+            $this->tool('adjust_grid', 'Adjust grid range and/or count. Cancels old orders and places new ones. PREFERRED over stop_bot when price drifts.', [
                 'bot_id' => ['type' => 'integer'],
-                'reason' => ['type' => 'string'],
+                'new_price_lower' => ['type' => 'number', 'description' => 'New lower bound for grid'],
+                'new_price_upper' => ['type' => 'number', 'description' => 'New upper bound for grid'],
+            ]),
+            $this->tool('stop_bot', 'Stop bot entirely. LAST RESORT only. Must justify in analysis why adjust_grid was not viable.', [
+                'bot_id' => ['type' => 'integer'],
+                'reason' => ['type' => 'string', 'description' => 'Detailed reason with specific numbers (price, PNL, grid range)'],
             ]),
             $this->tool('close_position', 'Market-close the Binance position.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('done', 'Finish. analysis=Spanish market assessment (2-3 sentences). summary=1 short sentence.', [
-                'analysis' => ['type' => 'string'],
-                'summary' => ['type' => 'string'],
+            $this->tool('done', 'Finish analysis. REQUIRED: detailed analysis in Spanish (3-5 sentences with specific prices/indicators) and 1 sentence summary.', [
+                'analysis' => ['type' => 'string', 'description' => 'Detailed market assessment in Spanish with specific numbers'],
+                'summary' => ['type' => 'string', 'description' => 'One concise sentence summary in Spanish'],
             ]),
         ];
     }
@@ -99,6 +106,7 @@ class AgentToolkit
                 'get_binance_position' => $this->toolGetPosition($bot),
                 'set_stop_loss' => $this->toolSetStopLoss($bot, $args),
                 'set_take_profit' => $this->toolSetTakeProfit($bot, $args),
+                'adjust_grid' => $this->toolAdjustGrid($bot, $args),
                 'cancel_all_orders' => $this->toolCancelAllOrders($bot),
                 'stop_bot' => $this->toolStopBot($bot, $args),
                 'close_position' => $this->toolClosePosition($bot),
@@ -266,6 +274,51 @@ class AgentToolkit
         ]);
 
         return ['success' => true, 'take_profit_price' => $price, 'previous' => $before ?: null];
+    }
+
+    private function toolAdjustGrid(Bot $bot, array $args): array
+    {
+        $newLower = (float) ($args['new_price_lower'] ?? 0);
+        $newUpper = (float) ($args['new_price_upper'] ?? 0);
+
+        if ($newLower <= 0 || $newUpper <= 0 || $newLower >= $newUpper) {
+            return ['error' => 'Invalid price range: lower must be > 0 and < upper'];
+        }
+
+        $oldLower = (float) $bot->price_lower;
+        $oldUpper = (float) $bot->price_upper;
+
+        $account = $bot->binanceAccount;
+        if (!$account) {
+            return ['error' => 'No Binance account linked'];
+        }
+
+        try {
+            $this->binanceFutures->cancelAllOrders($account, $bot->symbol);
+            $bot->orders()->where('status', 'open')->update(['status' => 'cancelled']);
+
+            $bot->update([
+                'price_lower' => $newLower,
+                'price_upper' => $newUpper,
+            ]);
+
+            $this->engine->reinitializeGrid($bot->fresh());
+
+            $this->logAction($bot, 'grid_adjusted', 'agent', [
+                'old_range' => "{$oldLower}-{$oldUpper}",
+                'new_range' => "{$newLower}-{$newUpper}",
+            ]);
+
+            return [
+                'success' => true,
+                'old_range' => "{$oldLower}-{$oldUpper}",
+                'new_range' => "{$newLower}-{$newUpper}",
+                'message' => "Grid adjusted from {$oldLower}-{$oldUpper} to {$newLower}-{$newUpper}",
+            ];
+        } catch (\Exception $e) {
+            Log::error('AgentToolkit: adjust_grid failed', ['error' => $e->getMessage()]);
+            return ['error' => 'Failed to adjust grid: ' . $e->getMessage()];
+        }
     }
 
     private function toolCancelAllOrders(Bot $bot): array

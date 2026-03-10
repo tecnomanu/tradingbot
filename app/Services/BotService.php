@@ -35,7 +35,7 @@ class BotService
                 'profit_per_grid' => $gridConfig['profit_per_grid'],
                 'commission_per_grid' => $gridConfig['commission_per_grid'],
                 'status' => BotStatus::Pending,
-                'ai_system_prompt' => $data['ai_system_prompt'] ?? \App\Services\Agent\AgentOrchestrator::defaultSystemPrompt(),
+                'ai_system_prompt' => $data['ai_system_prompt'] ?? \App\Services\Agent\AgentOrchestrator::defaultPersonality(),
                 'ai_user_prompt' => $data['ai_user_prompt'] ?? \App\Services\Agent\AgentOrchestrator::defaultUserPrompt(),
             ]);
 
