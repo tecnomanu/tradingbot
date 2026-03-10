@@ -127,11 +127,12 @@ PROMPT;
         return <<<'PROMPT'
 ## WORKFLOW (always follow this order)
 1. Call get_bot_status AND get_market_data first (always both).
-2. Analyze the data: compare price vs grid range, check RSI/MACD/Bollinger trends, review PNL, check position status.
-3. If anything looks concerning, call get_binance_position and/or get_open_orders for deeper insight.
-4. Apply the ACTION GATE below. If no action is justified, skip directly to step 6.
-5. Execute justified actions.
-6. Call done SEPARATELY (never in the same batch as action tools). done must be the ONLY tool call in its step.
+2. Check bot status: if the bot is STOPPED, only report status and market conditions. DO NOT call adjust_grid, set_stop_loss, set_take_profit, or any action that modifies the bot. A stopped bot should remain stopped unless explicitly restarted by the user.
+3. Analyze the data: compare price vs grid range, check RSI/MACD/Bollinger trends, review PNL, check position status.
+4. If anything looks concerning, call get_binance_position and/or get_open_orders for deeper insight.
+5. Apply the ACTION GATE below. If no action is justified, skip directly to step 7.
+6. Execute justified actions.
+7. ALWAYS call done as the final step. done must be the ONLY tool call in its step (never batch it with other tools).
 
 ## ⚠ ACTION GATE — MANDATORY CHECK BEFORE ANY ACTION
 Before calling adjust_grid, set_stop_loss, set_take_profit, stop_bot, or close_position, you MUST calculate and verify:
@@ -147,6 +148,8 @@ ONLY proceed with an action if AT LEAST ONE of these conditions is true:
 
 If NONE of these conditions is true → DO NOT CALL ANY ACTION TOOL. Just call done with a status report.
 Violating this gate is a critical error. "Optimizing" or "recentering" when conditions are normal is NOT justified.
+
+ABSOLUTE RULE: If the bot status is "stopped", NO action tools are allowed. Only call done with a status report.
 
 ## ANALYSIS REQUIREMENTS
 Your "analysis" in done() MUST always include (in Spanish):
@@ -342,10 +345,25 @@ P,
                     }
                 }
             } else {
+                // Model returned text instead of tool calls.
+                // Treat as final response if it looks like an analysis.
                 if (!empty($assistantMessage['content'])) {
-                    $output['summary'] = $assistantMessage['content'];
+                    $content = $assistantMessage['content'];
+                    $output['summary'] = mb_substr($content, 0, 200);
+                    $output['analysis'] = $content;
                 }
                 break;
+            }
+        }
+
+        // If loop ended without done(), try to extract analysis from last assistant message
+        if ($output['analysis'] === null) {
+            $lastAssistant = collect($messages)
+                ->filter(fn($m) => ($m['role'] ?? '') === 'assistant' && !empty($m['content']))
+                ->last();
+            if ($lastAssistant) {
+                $output['analysis'] = $lastAssistant['content'];
+                $output['summary'] = mb_substr($lastAssistant['content'], 0, 200);
             }
         }
 

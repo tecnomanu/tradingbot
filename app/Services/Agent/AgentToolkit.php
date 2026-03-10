@@ -95,8 +95,15 @@ class AgentToolkit
         ];
     }
 
+    private const ACTION_TOOLS = ['adjust_grid', 'set_stop_loss', 'set_take_profit', 'cancel_all_orders', 'stop_bot', 'close_position'];
+
     public function executeTool(string $name, array $args, Bot $bot): array
     {
+        // Hard block: never modify a stopped bot
+        if (in_array($name, self::ACTION_TOOLS) && $bot->status->value === 'stopped') {
+            return ['error' => 'Bot is stopped. Cannot execute action tools on a stopped bot. Only reporting tools are allowed.'];
+        }
+
         try {
             return match ($name) {
                 'get_market_data' => $this->toolGetMarketData($args),
