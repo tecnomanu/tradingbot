@@ -214,14 +214,34 @@ export default function Show({
                         ) : (
                             (bot.status === "pending" ||
                                 bot.status === "stopped") && (
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        router.post(`/bots/${bot.id}/start`)
-                                    }
-                                >
-                                    <Play className="mr-1 h-3 w-3" /> Iniciar
-                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="sm">
+                                            <Play className="mr-1 h-3 w-3" /> Iniciar
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>
+                                                ¿Iniciar bot{" "}
+                                                {bot.symbol.replace("USDT", "/USDT")}?
+                                            </AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                El bot comenzará a operar y colocará órdenes en Binance.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={() =>
+                                                    router.post(`/bots/${bot.id}/start`)
+                                                }
+                                            >
+                                                Iniciar bot
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             )
                         )}
                         <Button

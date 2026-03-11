@@ -1,3 +1,14 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -238,28 +249,67 @@ function BotCard({
             {/* Actions */}
             <div className="mt-3 flex gap-2">
                 {bot.status === "active" ? (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            router.post(`/bots/${bot.id}/stop`);
-                        }}
-                    >
-                        <Square className="mr-1 h-3 w-3" /> Detener
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Square className="mr-1 h-3 w-3" /> Detener
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    ¿Detener bot {bot.symbol.replace("USDT", "/USDT")}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Se cancelarán todas las órdenes abiertas y el bot dejará de operar.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => router.post(`/bots/${bot.id}/stop`)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    Detener bot
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 ) : (
-                    <Button
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            router.post(`/bots/${bot.id}/start`);
-                        }}
-                    >
-                        <Play className="mr-1 h-3 w-3" /> Iniciar
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Play className="mr-1 h-3 w-3" /> Iniciar
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    ¿Iniciar bot {bot.symbol.replace("USDT", "/USDT")}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    El bot comenzará a operar y colocará órdenes en Binance.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => router.post(`/bots/${bot.id}/start`)}
+                                >
+                                    Iniciar bot
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 )}
                 <Button
                     variant="ghost"

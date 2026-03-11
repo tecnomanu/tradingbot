@@ -10,7 +10,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { GridConfig } from "@/types/bot";
 import { formatCurrency, sideLabel } from "@/utils/formatters";
-import { Loader2, Shield } from "lucide-react";
+import { AlertTriangle, Loader2, Shield } from "lucide-react";
 
 interface FormData {
     symbol: string;
@@ -27,6 +27,7 @@ interface ConfirmParamsModalProps {
     config: GridConfig;
     formData: FormData;
     isEditing?: boolean;
+    editBotStatus?: string;
 }
 
 export default function ConfirmParamsModal({
@@ -37,7 +38,10 @@ export default function ConfirmParamsModal({
     config,
     formData,
     isEditing = false,
+    editBotStatus,
 }: ConfirmParamsModalProps) {
+    const isActiveBot = isEditing && editBotStatus === "active";
+
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
             <DialogContent className="sm:max-w-md">
@@ -53,6 +57,19 @@ export default function ConfirmParamsModal({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                    {isActiveBot && (
+                        <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 space-y-1.5">
+                            <div className="flex items-center gap-2 text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                                <AlertTriangle className="h-4 w-4" />
+                                Bot activo — se aplicarán los siguientes cambios:
+                            </div>
+                            <ul className="text-xs text-yellow-600/80 dark:text-yellow-400/80 space-y-0.5 pl-6 list-disc">
+                                <li>Se cancelarán todas las órdenes abiertas en Binance</li>
+                                <li>Se actualizará la configuración del grid</li>
+                                <li>Se colocarán nuevas órdenes con los parámetros actualizados</li>
+                            </ul>
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">
@@ -121,8 +138,14 @@ export default function ConfirmParamsModal({
                         {processing ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {isEditing ? "Guardando..." : "Creando..."}
+                                {isActiveBot
+                                    ? "Aplicando cambios..."
+                                    : isEditing
+                                      ? "Guardando..."
+                                      : "Creando..."}
                             </>
+                        ) : isActiveBot ? (
+                            "Aplicar cambios y reiniciar"
                         ) : isEditing ? (
                             "Guardar cambios"
                         ) : (

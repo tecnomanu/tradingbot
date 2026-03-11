@@ -244,14 +244,35 @@ function BotRow({ bot }: { bot: Bot }) {
                         </AlertDialogContent>
                     </AlertDialog>
                 ) : (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[10px] px-3"
-                        onClick={() => router.post(`/bots/${bot.id}/start`)}
-                    >
-                        Iniciar
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-[10px] px-3"
+                            >
+                                Iniciar
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    ¿Iniciar bot {bot.symbol.replace("USDT", "/USDT")}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    El bot comenzará a operar y colocará órdenes en Binance.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => router.post(`/bots/${bot.id}/start`)}
+                                >
+                                    Iniciar bot
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 )}
                 <Button
                     variant="ghost"

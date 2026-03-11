@@ -156,7 +156,7 @@ export default function Index({
                                     </span>
                                     {editBot!.status === "active" && (
                                         <span className="text-yellow-500/70 ml-2">
-                                            Bot activo: solo se guardan cambios si se detiene primero.
+                                            Bot activo: al guardar se detendrá, aplicarán los cambios y reiniciará automáticamente.
                                         </span>
                                     )}
                                     <div className="ml-auto flex items-center gap-2">
@@ -252,7 +252,6 @@ export default function Index({
                                                     balance={balance}
                                                     fetchingBalance={fetchingBalance}
                                                     isEditing={isEditing}
-                                                    editBotStatus={editBot?.status}
                                                     editBotId={editBot?.id}
                                                     showGridLines={showGridLines}
                                                     onShowGridLinesChange={setShowGridLines}
@@ -299,6 +298,7 @@ export default function Index({
                     config={gridConfig}
                     formData={data}
                     isEditing={isEditing}
+                    editBotStatus={editBot?.status}
                 />
             )}
         </AuthenticatedLayout>

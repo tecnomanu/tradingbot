@@ -347,15 +347,12 @@ class BotController extends Controller
     }
 
     /**
-     * Update bot configuration (only when stopped).
+     * Update bot configuration. If bot is active, it will be stopped,
+     * reconfigured and restarted automatically.
      */
     public function update(Request $request, Bot $bot): RedirectResponse
     {
         $this->authorizeBot($request, $bot);
-
-        if ($bot->status === BotStatus::Active) {
-            return back()->with('error', 'No se puede editar un bot activo. Detenelo primero.');
-        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -368,6 +365,13 @@ class BotController extends Controller
             'stop_loss_price' => 'nullable|numeric|min:0',
             'take_profit_price' => 'nullable|numeric|min:0',
         ]);
+
+        $wasActive = $bot->status === BotStatus::Active;
+
+        if ($wasActive) {
+            $this->botService->stopBot($bot);
+            $bot->refresh();
+        }
 
         $gridConfig = $this->gridCalculator->calculateFullGridConfig([
             'price_lower' => $validated['price_lower'],
@@ -385,6 +389,13 @@ class BotController extends Controller
             'profit_per_grid' => $gridConfig['profit_per_grid'],
             'commission_per_grid' => $gridConfig['commission_per_grid'],
         ]));
+
+        if ($wasActive) {
+            $this->botService->startBot($bot);
+
+            return redirect()->route('bots.show', $bot->id)
+                ->with('success', 'Bot actualizado y reiniciado. Las nuevas órdenes se colocarán en breve.');
+        }
 
         return redirect()->route('bots.show', $bot->id)
             ->with('success', 'Bot actualizado exitosamente');

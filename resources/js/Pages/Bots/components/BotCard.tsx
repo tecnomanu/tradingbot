@@ -1,3 +1,14 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,12 +30,10 @@ interface BotCardProps {
 }
 
 export default function BotCard({ bot }: BotCardProps) {
-    const handleStart = (e: React.MouseEvent) => {
-        e.preventDefault();
+    const handleStart = () => {
         router.post(`/bots/${bot.id}/start`);
     };
-    const handleStop = (e: React.MouseEvent) => {
-        e.preventDefault();
+    const handleStop = () => {
         router.post(`/bots/${bot.id}/stop`);
     };
 
@@ -121,17 +130,56 @@ export default function BotCard({ bot }: BotCardProps) {
             </Link>
             <CardFooter className="pt-0">
                 {bot.status === "active" ? (
-                    <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleStop}
-                    >
-                        <Square className="mr-1 h-3 w-3" /> Detener
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                                <Square className="mr-1 h-3 w-3" /> Detener
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    ¿Detener bot {bot.symbol.replace("USDT", "/USDT")}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Se cancelarán todas las órdenes abiertas y el bot dejará de operar.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={handleStop}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                    Detener bot
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 ) : bot.status === "pending" || bot.status === "stopped" ? (
-                    <Button size="sm" onClick={handleStart}>
-                        <Play className="mr-1 h-3 w-3" /> Iniciar
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button size="sm">
+                                <Play className="mr-1 h-3 w-3" /> Iniciar
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    ¿Iniciar bot {bot.symbol.replace("USDT", "/USDT")}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    El bot comenzará a operar y colocará órdenes en Binance.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleStart}>
+                                    Iniciar bot
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 ) : null}
             </CardFooter>
         </Card>

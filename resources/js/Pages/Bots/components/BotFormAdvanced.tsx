@@ -52,7 +52,6 @@ interface BotFormAdvancedProps {
     balance: number | null;
     fetchingBalance: boolean;
     isEditing?: boolean;
-    editBotStatus?: string;
     editBotId?: number;
     showGridLines?: boolean;
     onShowGridLinesChange?: (v: boolean) => void;
@@ -69,7 +68,6 @@ export default function BotFormAdvanced({
     balance,
     fetchingBalance,
     isEditing = false,
-    editBotStatus,
     editBotId,
     showGridLines = true,
     onShowGridLinesChange,
@@ -88,10 +86,8 @@ export default function BotFormAdvanced({
     const investment = parseFloat(data.investment) || 0;
     const isInvestmentValid =
         balance !== null && investment <= balance && investment > 0;
-    const editDisabled = isEditing && editBotStatus === "active";
     const canCalculate =
         !processing &&
-        !editDisabled &&
         !!data.price_lower &&
         !!data.price_upper &&
         !!data.binance_account_id &&
@@ -611,8 +607,6 @@ export default function BotFormAdvanced({
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Calculando...
                         </>
-                    ) : editDisabled ? (
-                        "Bot activo — detenelo para editar"
                     ) : isEditing ? (
                         "Guardar cambios"
                     ) : (
