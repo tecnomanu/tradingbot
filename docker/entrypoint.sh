@@ -14,10 +14,10 @@ if [ "$CONTAINER_ROLE" = "app" ] || [ -z "$CONTAINER_ROLE" ]; then
     php artisan cache:clear 2>&1
 
     echo "Waiting for database..."
-    for i in $(seq 1 30); do
-        php artisan db:show --no-interaction > /dev/null 2>&1 && echo "DB ready!" && break
-        echo "  attempt $i/30..."
-        sleep 2
+    for i in $(seq 1 60); do
+        mysqladmin ping -h"$DB_HOST" -P"${DB_PORT:-3306}" -u"$DB_USERNAME" -p"$DB_PASSWORD" --silent 2>/dev/null && echo "DB ready!" && break
+        echo "  attempt $i/60..."
+        sleep 1
     done
 
     echo "Running migrations..."
