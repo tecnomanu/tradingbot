@@ -27,10 +27,11 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { BinanceAccount } from "@/types/bot";
-import { LEVERAGE_OPTIONS, SUPPORTED_PAIRS } from "@/utils/constants";
+import { LEVERAGE_OPTIONS } from "@/utils/constants";
 import { Link } from "@inertiajs/react";
-import { Info, Loader2 } from "lucide-react";
+import { ChevronDown, Info, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import PairSelector from "./PairSelector";
 
 interface BotFormData {
     binance_account_id: string;
@@ -153,21 +154,30 @@ export default function BotFormAdvanced({
                         <Label className="text-[11px] text-muted-foreground">
                             Elija un par comercial
                         </Label>
-                        <Select
+                        <PairSelector
                             value={data.symbol}
                             onValueChange={(v) => setData("symbol", v)}
+                            isFutures={isFutures}
+                            align="start"
                         >
-                            <SelectTrigger className="h-9 text-xs">
-                                <SelectValue placeholder="Seleccionar par" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SUPPORTED_PAIRS.map((pair) => (
-                                    <SelectItem key={pair} value={pair}>
-                                        {pair.replace("USDT", "/USDT")}{isFutures ? " Perp" : ""}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            <button
+                                type="button"
+                                className="flex items-center justify-between w-full h-9 px-3 text-xs border rounded-md bg-background hover:bg-muted/40 transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <img
+                                        src={`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${data.symbol.replace("USDT", "").toLowerCase()}.png`}
+                                        alt={data.symbol}
+                                        className="w-4 h-4 rounded-full"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                    />
+                                    <span className="font-medium">
+                                        {data.symbol.replace("USDT", "/USDT")}{isFutures ? " Perp" : ""}
+                                    </span>
+                                </div>
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            </button>
+                        </PairSelector>
                         {errors.symbol && (
                             <p className="text-[10px] text-destructive">
                                 {errors.symbol}

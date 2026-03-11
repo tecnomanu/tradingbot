@@ -20,6 +20,7 @@ export interface Bot {
     price_lower: number;
     price_upper: number;
     grid_count: number;
+    grid_mode?: string;
     investment: number;
     leverage: number;
     slippage: number;

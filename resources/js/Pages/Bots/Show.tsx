@@ -54,6 +54,7 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+import { type BotPreviewData } from "./components/BotPreviewPanel";
 import OrdersTable from "./components/OrdersTable";
 import TradingViewChart, { ChartOrder } from "./components/TradingViewChart";
 
@@ -377,6 +378,25 @@ export default function Show({
                                     gridCount={Number(bot.grid_count)}
                                     side={bot.side}
                                     orders={chartOrders}
+                                    botPreview={{
+                                        symbol: bot.symbol,
+                                        side: bot.side,
+                                        priceLower: Number(bot.price_lower),
+                                        priceUpper: Number(bot.price_upper),
+                                        gridCount: Number(bot.grid_count),
+                                        investment: String(bot.investment),
+                                        leverage: String(bot.leverage),
+                                        slippage: String(bot.slippage),
+                                        stopLoss: bot.stop_loss_price ? String(bot.stop_loss_price) : undefined,
+                                        takeProfit: bot.take_profit_price ? String(bot.take_profit_price) : undefined,
+                                        gridMode: bot.grid_mode || "arithmetic",
+                                        botMode: Number(bot.leverage) > 1 ? "futures" : "spot",
+                                        status: bot.status,
+                                        totalPnl: bot.total_pnl,
+                                        gridProfit: bot.grid_profit,
+                                        pendingOrders: chartOrders.filter(o => o.status === "open").length,
+                                        filledOrders: chartOrders.filter(o => o.status === "filled").length,
+                                    } satisfies BotPreviewData}
                                 />
                             </div>
                         </CardContent>

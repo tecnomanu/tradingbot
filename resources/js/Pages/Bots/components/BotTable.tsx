@@ -13,7 +13,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Bot } from "@/types/bot";
 import { Link, router } from "@inertiajs/react";
-import { Bot as BotIcon, Pencil } from "lucide-react";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Bot as BotIcon, Eye, Pencil, Play, Square } from "lucide-react";
 import { useState } from "react";
 
 interface BotTableProps {
@@ -85,8 +91,9 @@ export default function BotTable({ bots }: BotTableProps) {
                     </div>
                 ) : (
                     <div className="min-w-[900px]">
-                        <div className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.8fr_1fr_0.7fr_0.7fr_1.2fr] text-[10px] text-muted-foreground border-b px-4 py-2 bg-muted/5 font-medium">
+                        <div className="grid grid-cols-[1.5fr_100px_0.8fr_0.8fr_0.8fr_1fr_0.7fr_0.7fr] text-[10px] text-muted-foreground border-b px-4 py-2 bg-muted/5 font-medium">
                             <div>Bot</div>
+                            <div className="text-center">Acciones</div>
                             <div>Par</div>
                             <div className="text-right">Inversión real</div>
                             <div className="text-right">Ganancia</div>
@@ -95,7 +102,6 @@ export default function BotTable({ bots }: BotTableProps) {
                             </div>
                             <div className="text-center">Órdenes</div>
                             <div className="text-right">Margen adic.</div>
-                            <div className="text-center">Operación</div>
                         </div>
 
                         {filteredBots.map((bot) => (
@@ -125,194 +131,229 @@ function BotRow({ bot }: { bot: Bot }) {
     };
 
     return (
-        <div className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.8fr_1fr_0.7fr_0.7fr_1.2fr] items-center text-xs border-b px-4 py-3 hover:bg-muted/20 transition-colors">
-            <div className="flex items-center gap-2">
-                <div
-                    className={cn(
-                        "w-1.5 h-1.5 rounded-full",
-                        bot.status === "active"
-                            ? "bg-green-500 pulse-active"
-                            : bot.status === "pending"
-                              ? "bg-yellow-500"
-                              : bot.status === "error"
-                                ? "bg-red-500"
-                                : "bg-muted-foreground",
-                    )}
-                />
-                <span className="font-medium">
-                    {bot.symbol.replace("USDT", "/USDT")} Grid Bot
-                </span>
-            </div>
+        <TooltipProvider delayDuration={200}>
+            <div className="grid grid-cols-[1.5fr_100px_0.8fr_0.8fr_0.8fr_1fr_0.7fr_0.7fr] items-center text-xs border-b px-4 py-3 hover:bg-muted/20 transition-colors">
+                <div className="flex items-center gap-2">
+                    <div
+                        className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0",
+                            bot.status === "active"
+                                ? "bg-green-500 pulse-active"
+                                : bot.status === "pending"
+                                  ? "bg-yellow-500"
+                                  : bot.status === "error"
+                                    ? "bg-red-500"
+                                    : "bg-muted-foreground",
+                        )}
+                    />
+                    <div className="min-w-0">
+                        <span className="font-medium">
+                            {bot.symbol.replace("USDT", "/USDT")} Grid Bot
+                        </span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                            <span className={cn(
+                                "text-[10px] px-1 py-0.5 rounded",
+                                isFutures
+                                    ? "bg-blue-500/15 text-blue-500"
+                                    : "bg-emerald-500/15 text-emerald-500",
+                            )}>
+                                {isFutures ? "Futures" : "Spot"}
+                            </span>
+                            {isFutures && (
+                                <span className="text-[10px] text-muted-foreground">
+                                    {bot.leverage}x
+                                </span>
+                            )}
+                            <span
+                                className={cn(
+                                    "text-[10px] px-1 py-0.5 rounded",
+                                    bot.side === "long"
+                                        ? "bg-green-500/15 text-green-500"
+                                        : bot.side === "short"
+                                          ? "bg-red-500/15 text-red-500"
+                                          : "bg-yellow-500/15 text-yellow-500",
+                                )}
+                            >
+                                {bot.side === "long" ? "Long" : bot.side === "short" ? "Short" : "Neutral"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
-            <div>
+                {/* Action icons */}
+                <div className="flex items-center justify-center gap-1 px-2">
+                    {bot.status === "active" ? (
+                        <AlertDialog>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                                            disabled={stopping}
+                                        >
+                                            <Square className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                    Detener bot
+                                </TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                        ¿Detener bot{" "}
+                                        {bot.symbol.replace("USDT", "/USDT")}?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Se cancelarán todas las órdenes abiertas en
+                                        Binance y el bot dejará de operar.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={handleStop}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                        Detener bot
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    ) : (
+                        <AlertDialog>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-green-400 hover:text-green-500 hover:bg-green-500/10"
+                                        >
+                                            <Play className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                    Iniciar bot
+                                </TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                        ¿Iniciar bot {bot.symbol.replace("USDT", "/USDT")}?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        El bot comenzará a operar y colocará órdenes en Binance.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={() => router.post(`/bots/${bot.id}/start`)}
+                                    >
+                                        Iniciar bot
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                asChild
+                            >
+                                <Link href={`/bots/${bot.id}`}>
+                                    <Eye className="h-3.5 w-3.5" />
+                                </Link>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">
+                            Ver detalles
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                asChild
+                            >
+                                <Link href={`/bots/${bot.id}/edit`}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                </Link>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs">
+                            Editar bot
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
+
                 <div className="font-medium">
                     {bot.symbol.replace("USDT", "/USDT")}
                 </div>
-                <div className="flex items-center gap-1 mt-0.5">
+
+                <div className="text-right tabular-nums">
+                    {investment.toFixed(1)} USDT
+                </div>
+
+                <div className="text-right">
                     <span
                         className={cn(
-                            "text-[10px] px-1 py-0.5 rounded",
-                            bot.side === "long"
-                                ? "bg-green-500/15 text-green-500"
-                                : "bg-red-500/15 text-red-500",
+                            "font-medium tabular-nums",
+                            pnl >= 0 ? "text-green-500" : "text-red-500",
                         )}
                     >
-                        {bot.side === "long" ? "Largo" : "Corto"}
+                        {pnl > 0 ? "+" : ""}
+                        {pnl.toFixed(2)} USDT
                     </span>
-                    {isFutures && (
-                        <span className="text-[10px] text-muted-foreground">
-                            {bot.leverage}x
+                    <div
+                        className={cn(
+                            "text-[10px] tabular-nums",
+                            pnl >= 0 ? "text-green-500" : "text-red-500",
+                        )}
+                    >
+                        ({pnlPct.toFixed(2)}%)
+                    </div>
+                </div>
+
+                <div className="text-right tabular-nums text-muted-foreground">
+                    {parseFloat(
+                        (bot.est_liquidation_price as any) || 0,
+                    ).toLocaleString("en-US", { minimumFractionDigits: 1 })}{" "}
+                    USDT
+                </div>
+
+                <div className="text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                        <span className="tabular-nums text-yellow-500" title="Pendientes">
+                            {bot.open_orders_count ?? 0}
                         </span>
-                    )}
-                    <span className={cn(
-                        "text-[10px] px-1 py-0.5 rounded",
-                        isFutures
-                            ? "bg-blue-500/15 text-blue-500"
-                            : "bg-emerald-500/15 text-emerald-500",
-                    )}>
-                        {isFutures ? "Futuros" : "Spot"}
-                    </span>
+                        <span className="text-muted-foreground">/</span>
+                        <span className="tabular-nums text-green-500" title="Ejecutadas">
+                            {bot.filled_orders_count ?? 0}
+                        </span>
+                    </div>
+                    <div className="text-[9px] text-muted-foreground">
+                        pend / ejec
+                    </div>
+                </div>
+
+                <div className="text-right tabular-nums text-muted-foreground">
+                    {parseFloat((bot.additional_margin as any) || 0).toFixed(1)}{" "}
+                    USDT
                 </div>
             </div>
-
-            <div className="text-right tabular-nums">
-                {investment.toFixed(1)} USDT
-            </div>
-
-            <div className="text-right">
-                <span
-                    className={cn(
-                        "font-medium tabular-nums",
-                        pnl >= 0 ? "text-green-500" : "text-red-500",
-                    )}
-                >
-                    {pnl > 0 ? "+" : ""}
-                    {pnl.toFixed(2)} USDT
-                </span>
-                <div
-                    className={cn(
-                        "text-[10px] tabular-nums",
-                        pnl >= 0 ? "text-green-500" : "text-red-500",
-                    )}
-                >
-                    ({pnlPct.toFixed(2)}%)
-                </div>
-            </div>
-
-            <div className="text-right tabular-nums text-muted-foreground">
-                {parseFloat(
-                    (bot.est_liquidation_price as any) || 0,
-                ).toLocaleString("en-US", { minimumFractionDigits: 1 })}{" "}
-                USDT
-            </div>
-
-            {/* Order counts */}
-            <div className="text-center">
-                <div className="flex items-center justify-center gap-1.5">
-                    <span className="tabular-nums text-yellow-500" title="Pendientes">
-                        {bot.open_orders_count ?? 0}
-                    </span>
-                    <span className="text-muted-foreground">/</span>
-                    <span className="tabular-nums text-green-500" title="Ejecutadas">
-                        {bot.filled_orders_count ?? 0}
-                    </span>
-                </div>
-                <div className="text-[9px] text-muted-foreground">
-                    pend / ejec
-                </div>
-            </div>
-
-            <div className="text-right tabular-nums text-muted-foreground">
-                {parseFloat((bot.additional_margin as any) || 0).toFixed(1)}{" "}
-                USDT
-            </div>
-
-            <div className="flex justify-center gap-2">
-                {bot.status === "active" ? (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-[10px] px-3"
-                                disabled={stopping}
-                            >
-                                {stopping ? "Deteniendo..." : "Detener"}
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                    ¿Detener bot{" "}
-                                    {bot.symbol.replace("USDT", "/USDT")}?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Se cancelarán todas las órdenes abiertas en
-                                    Binance y el bot dejará de operar.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={handleStop}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                    Detener bot
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                ) : (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-[10px] px-3"
-                            >
-                                Iniciar
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                    ¿Iniciar bot {bot.symbol.replace("USDT", "/USDT")}?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    El bot comenzará a operar y colocará órdenes en Binance.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={() => router.post(`/bots/${bot.id}/start`)}
-                                >
-                                    Iniciar bot
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                )}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-[10px] px-3"
-                    asChild
-                >
-                    <Link href={`/bots/${bot.id}`}>Detalles</Link>
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-[10px] px-2"
-                    asChild
-                    title="Editar"
-                >
-                    <Link href={`/bots/${bot.id}/edit`}>
-                        <Pencil className="h-3 w-3" />
-                    </Link>
-                </Button>
-            </div>
-        </div>
+        </TooltipProvider>
     );
 }

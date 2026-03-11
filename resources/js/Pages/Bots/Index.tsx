@@ -17,7 +17,8 @@ import BotTable from "./components/BotTable";
 import ConfirmParamsModal from "./components/ConfirmParamsModal";
 import OrderBook from "./components/OrderBook";
 import TickerBar from "./components/TickerBar";
-import TradingViewChart, { BotPreview, ChartOrder } from "./components/TradingViewChart";
+import TradingViewChart, { ChartOrder } from "./components/TradingViewChart";
+import { type BotPreviewData } from "./components/BotPreviewPanel";
 
 interface EditBot {
     id: number;
@@ -97,7 +98,7 @@ export default function Index({
     const chartGridCount = showGridLines && data.grid_count ? parseInt(data.grid_count) : undefined;
     const chartSide = data.side;
 
-    const botPreview: BotPreview = {
+    const botPreview: BotPreviewData = {
         symbol: data.symbol,
         side: data.side,
         priceLower: chartLower,
@@ -199,6 +200,8 @@ export default function Index({
                             <TickerBar
                                 symbol={chartSymbol}
                                 onPriceUpdate={setCurrentPrice}
+                                onSymbolChange={(s) => setData("symbol", s)}
+                                isFutures={botMode === "futures"}
                             />
 
                             <div className="flex-1 min-h-0">

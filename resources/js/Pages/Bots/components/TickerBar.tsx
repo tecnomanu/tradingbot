@@ -1,5 +1,13 @@
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import PairSelector from "./PairSelector";
 
 function StatCell({
     label,
@@ -35,6 +43,8 @@ interface TickerData {
 interface TickerBarProps {
     symbol: string;
     onPriceUpdate?: (price: number) => void;
+    onSymbolChange?: (symbol: string) => void;
+    isFutures?: boolean;
 }
 
 function formatVolume(v: number): string {
@@ -44,7 +54,7 @@ function formatVolume(v: number): string {
     return v.toFixed(2);
 }
 
-export default function TickerBar({ symbol, onPriceUpdate }: TickerBarProps) {
+export default function TickerBar({ symbol, onPriceUpdate, onSymbolChange, isFutures = true }: TickerBarProps) {
     const [ticker, setTicker] = useState<TickerData | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
 
@@ -83,24 +93,42 @@ export default function TickerBar({ symbol, onPriceUpdate }: TickerBarProps) {
 
     return (
         <div className="flex items-center gap-5 px-4 py-2 border-b bg-card/50 text-foreground shrink-0 overflow-x-auto whitespace-nowrap">
-            <div className="flex items-center gap-2.5 shrink-0">
-                <img
-                    src={`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${baseCoin.toLowerCase()}.png`}
-                    alt={baseCoin}
-                    className="w-6 h-6 rounded-full"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                />
-                <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold tracking-tight">
-                        {symbolDisplay}
-                    </span>
-                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                        Perp
-                    </span>
-                </div>
-            </div>
+            <PairSelector
+                value={symbol}
+                onValueChange={(pair) => onSymbolChange?.(pair)}
+                isFutures={isFutures}
+            >
+                <button className="flex items-center gap-2.5 shrink-0 group cursor-pointer hover:bg-muted/40 rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors">
+                    <img
+                        src={`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${baseCoin.toLowerCase()}.png`}
+                        alt={baseCoin}
+                        className="w-6 h-6 rounded-full"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                    />
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold tracking-tight">
+                            {symbolDisplay}
+                        </span>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                        {isFutures ? "Perp" : "Spot"}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs max-w-[200px]">
+                                    {isFutures
+                                        ? "Contrato perpetuo de futuros: permite operar con apalancamiento sin fecha de vencimiento."
+                                        : "Mercado spot: compra y venta directa del activo sin apalancamiento."}
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </button>
+            </PairSelector>
 
             <div className="flex flex-col leading-tight shrink-0">
                 <span

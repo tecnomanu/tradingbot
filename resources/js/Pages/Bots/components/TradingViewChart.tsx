@@ -1,5 +1,6 @@
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { cn } from "@/lib/utils";
+import BotPreviewPanel, { type BotPreviewData } from "./BotPreviewPanel";
 import {
     ColorType,
     CrosshairMode,
@@ -21,21 +22,6 @@ export interface ChartOrder {
     filled_at_fmt?: string;
 }
 
-export interface BotPreview {
-    symbol: string;
-    side: string;
-    priceLower?: number;
-    priceUpper?: number;
-    gridCount?: number;
-    investment: string;
-    leverage: string;
-    slippage: string;
-    stopLoss?: string;
-    takeProfit?: string;
-    gridMode: string;
-    botMode: string;
-}
-
 interface TradingViewChartProps {
     symbol: string;
     lowerPrice?: number;
@@ -43,7 +29,7 @@ interface TradingViewChartProps {
     gridCount?: number;
     side?: string;
     orders?: ChartOrder[];
-    botPreview?: BotPreview;
+    botPreview?: BotPreviewData;
 }
 
 const INTERVALS = [
@@ -60,7 +46,7 @@ const INTERVALS = [
 async function fetchKlines(
     symbol: string,
     interval: string,
-    limit = 300,
+    limit = 1000,
 ): Promise<any[]> {
     const res = await fetch(
         `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
@@ -99,7 +85,7 @@ export default function TradingViewChart({
     const { isDark } = useDarkMode();
     const [interval, setInterval] = useState("1d");
     const [loading, setLoading] = useState(false);
-    const [showPreview, setShowPreview] = useState(true);
+    const [candlesReady, setCandlesReady] = useState(0);
 
     const buildChart = useCallback(() => {
         if (!containerRef.current) return;
@@ -191,6 +177,7 @@ export default function TradingViewChart({
                 candleDataRef.current = data;
                 candleRef.current?.setData(data as any);
                 chartRef.current?.timeScale().fitContent();
+                setCandlesReady((c) => c + 1);
             })
             .catch(console.error)
             .finally(() => setLoading(false));
@@ -326,7 +313,7 @@ export default function TradingViewChart({
             } catch {}
             lowerAreaRef.current = lowerArea;
         }
-    }, [lowerPrice, upperPrice, gridCount, side, isDark, interval]);
+    }, [lowerPrice, upperPrice, gridCount, side, isDark, interval, candlesReady]);
 
     useEffect(() => {
         const series = candleRef.current;
@@ -410,111 +397,8 @@ export default function TradingViewChart({
             <div className="flex-1 min-h-0 relative">
                 <div className="absolute inset-0" ref={containerRef} />
 
-                {/* Bot preview floating panel */}
-                {hasPreviewData && showPreview && botPreview && (
-                    <div className="absolute top-2 left-2 z-10 bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg p-2.5 text-[10px] shadow-lg max-w-[200px] select-none">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-semibold text-foreground">
-                                Preview Bot
-                            </span>
-                            <button
-                                onClick={() => setShowPreview(false)}
-                                className="text-muted-foreground hover:text-foreground transition-colors ml-2 leading-none"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="space-y-1 text-muted-foreground">
-                            <div className="flex justify-between">
-                                <span>Par</span>
-                                <span className="text-foreground font-medium">
-                                    {botPreview.symbol.replace("USDT", "/USDT")}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Modo</span>
-                                <span className={cn(
-                                    "font-medium px-1 rounded",
-                                    botPreview.botMode === "futures"
-                                        ? "text-blue-400 bg-blue-500/10"
-                                        : "text-emerald-400 bg-emerald-500/10",
-                                )}>
-                                    {botPreview.botMode === "futures" ? "Futuros" : "Spot"}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Dirección</span>
-                                <span className={cn(
-                                    "font-medium",
-                                    botPreview.side === "long"
-                                        ? "text-green-500"
-                                        : botPreview.side === "short"
-                                          ? "text-red-500"
-                                          : "text-foreground",
-                                )}>
-                                    {botPreview.side === "long" ? "Long" : botPreview.side === "short" ? "Short" : "Neutral"}
-                                </span>
-                            </div>
-                            {botPreview.priceLower != null && botPreview.priceUpper != null && (
-                                <div className="flex justify-between">
-                                    <span>Rango</span>
-                                    <span className="text-foreground tabular-nums">
-                                        {botPreview.priceLower.toLocaleString()} - {botPreview.priceUpper.toLocaleString()}
-                                    </span>
-                                </div>
-                            )}
-                            {botPreview.gridCount != null && (
-                                <div className="flex justify-between">
-                                    <span>Rejillas</span>
-                                    <span className="text-foreground tabular-nums">{botPreview.gridCount}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between">
-                                <span>Inversión</span>
-                                <span className="text-foreground tabular-nums">{botPreview.investment} USDT</span>
-                            </div>
-                            {botPreview.botMode === "futures" && Number(botPreview.leverage) > 1 && (
-                                <div className="flex justify-between">
-                                    <span>Leverage</span>
-                                    <span className="text-foreground tabular-nums">{botPreview.leverage}x</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between">
-                                <span>Grid</span>
-                                <span className="text-foreground">
-                                    {botPreview.gridMode === "geometric" ? "Geométrica" : "Aritmética"}
-                                </span>
-                            </div>
-                            {botPreview.stopLoss && (
-                                <div className="flex justify-between">
-                                    <span>SL</span>
-                                    <span className="text-red-400 tabular-nums">{botPreview.stopLoss}</span>
-                                </div>
-                            )}
-                            {botPreview.takeProfit && (
-                                <div className="flex justify-between">
-                                    <span>TP</span>
-                                    <span className="text-green-400 tabular-nums">{botPreview.takeProfit}</span>
-                                </div>
-                            )}
-                            {botPreview.slippage && (
-                                <div className="flex justify-between">
-                                    <span>Slippage</span>
-                                    <span className="text-foreground tabular-nums">{botPreview.slippage}%</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {!showPreview && hasPreviewData && (
-                    <button
-                        onClick={() => setShowPreview(true)}
-                        className="absolute top-2 left-2 z-10 bg-card/80 backdrop-blur-sm border border-border/50 rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors shadow-sm"
-                    >
-                        Preview ▸
-                    </button>
+                {hasPreviewData && botPreview && (
+                    <BotPreviewPanel data={botPreview} />
                 )}
             </div>
         </div>
