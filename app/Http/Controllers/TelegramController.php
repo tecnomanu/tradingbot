@@ -70,16 +70,16 @@ class TelegramController extends Controller
         $user->update(['telegram_link_token' => $token]);
 
         $botToken = config('services.telegram.bot_token');
-        $botUsername = null;
+        $botUsername = config('services.telegram.bot_username');
 
-        if ($botToken) {
+        if ($botToken && !$botUsername) {
             try {
-                $info = \Illuminate\Support\Facades\Http::get(
+                $info = \Illuminate\Support\Facades\Http::timeout(5)->get(
                     "https://api.telegram.org/bot{$botToken}/getMe"
                 )->json();
                 $botUsername = $info['result']['username'] ?? null;
             } catch (\Exception $e) {
-                // ignore
+                \Illuminate\Support\Facades\Log::warning('Telegram getMe failed', ['error' => $e->getMessage()]);
             }
         }
 

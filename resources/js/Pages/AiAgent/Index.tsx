@@ -29,7 +29,6 @@ import {
     Shield,
     Sparkles,
     Wrench,
-    Zap,
 } from "lucide-react";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 
@@ -61,17 +60,6 @@ interface ActionLog {
     bot?: { id: number; symbol: string } | null;
 }
 
-interface QuickAnalysis {
-    id: number;
-    bot_id: number | null;
-    symbol: string;
-    signal: string | null;
-    confidence: number | null;
-    reasoning: string | null;
-    suggestion: { action?: string } | null;
-    created_at: string;
-}
-
 interface UserBot {
     id: number;
     symbol: string;
@@ -86,13 +74,11 @@ interface Props {
         last_page: number;
     };
     actionLogs: ActionLog[];
-    quickAnalyses: QuickAnalysis[];
     stats: {
         total_conversations: number;
         total_tool_calls: number;
         total_actions: number;
         avg_duration: number;
-        total_quick_analyses: number;
     };
     userBots: UserBot[];
 }
@@ -134,18 +120,6 @@ const actionColors: Record<string, string> = {
     grid_adjusted: "text-blue-400",
 };
 
-const signalColors: Record<string, string> = {
-    bullish: "text-emerald-400",
-    bearish: "text-red-400",
-    neutral: "text-yellow-400",
-};
-
-const signalBg: Record<string, string> = {
-    bullish: "bg-emerald-500/10 border-emerald-500/20",
-    bearish: "bg-red-500/10 border-red-500/20",
-    neutral: "bg-yellow-500/10 border-yellow-500/20",
-};
-
 function formatActionDetails(action: string, details: Record<string, any> | null): string {
     if (!details) return "";
     switch (action) {
@@ -178,7 +152,6 @@ function SectionDivider({ label }: { label: string }) {
 export default function AiAgentIndex({
     conversations,
     actionLogs,
-    quickAnalyses,
     stats,
     userBots,
 }: Props) {
@@ -196,6 +169,11 @@ export default function AiAgentIndex({
         [conversations.data, filterBotId],
     );
 
+    const completedConversations = useMemo(
+        () => filteredConversations.filter((c) => c.status === "completed" && c.summary),
+        [filteredConversations],
+    );
+
     const filteredActions = useMemo(
         () =>
             filterBotId
@@ -204,16 +182,8 @@ export default function AiAgentIndex({
         [actionLogs, filterBotId],
     );
 
-    const filteredAnalyses = useMemo(
-        () =>
-            filterBotId
-                ? quickAnalyses.filter((a) => a.bot_id === filterBotId)
-                : quickAnalyses,
-        [quickAnalyses, filterBotId],
-    );
-
-    const latestAnalysis = filteredAnalyses[0] ?? null;
-    const olderAnalyses = filteredAnalyses.slice(1);
+    const latestAnalysis = completedConversations[0] ?? null;
+    const olderAnalyses = completedConversations.slice(1);
 
     const latestConversation = filteredConversations[0] ?? null;
     const olderConversations = filteredConversations.slice(1);
@@ -313,9 +283,8 @@ export default function AiAgentIndex({
                 )}
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {[
-                        { icon: Zap, label: "Análisis", value: stats.total_quick_analyses },
                         { icon: MessageSquare, label: "Consultas", value: stats.total_conversations },
                         { icon: Wrench, label: "Tool Calls", value: stats.total_tool_calls },
                         { icon: Shield, label: "Acciones", value: stats.total_actions },
@@ -337,7 +306,7 @@ export default function AiAgentIndex({
                     ))}
                 </div>
 
-                {/* Tabs - Reordered: Análisis > Acciones > Conversaciones */}
+                {/* Tabs */}
                 <Tabs defaultValue="quick">
                     <TabsList>
                         <TabsTrigger value="quick" className="gap-1.5">
@@ -354,28 +323,28 @@ export default function AiAgentIndex({
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* Quick Analysis Tab */}
+                    {/* Quick Analysis Tab - powered by AiConversation summaries */}
                     <TabsContent value="quick">
                         <Card className="bg-card/50">
                             <CardContent className="p-0">
-                                {filteredAnalyses.length === 0 ? (
+                                {completedConversations.length === 0 ? (
                                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                                         <Sparkles className="h-12 w-12 text-muted-foreground/30" />
-                                        <p className="text-muted-foreground">Sin análisis rápidos</p>
+                                        <p className="text-muted-foreground">Sin análisis todavía</p>
                                     </div>
                                 ) : (
                                     <>
                                         {latestAnalysis && (
                                             <>
                                                 <SectionDivider label="Último análisis" />
-                                                <AnalysisItem a={latestAnalysis} highlight />
+                                                <QuickAnalysisItem conv={latestAnalysis} highlight />
                                             </>
                                         )}
                                         {olderAnalyses.length > 0 && (
                                             <>
                                                 <SectionDivider label="Histórico" />
-                                                {olderAnalyses.map((a) => (
-                                                    <AnalysisItem key={a.id} a={a} />
+                                                {olderAnalyses.map((conv) => (
+                                                    <QuickAnalysisItem key={conv.id} conv={conv} />
                                                 ))}
                                             </>
                                         )}
@@ -426,7 +395,7 @@ export default function AiAgentIndex({
                                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                                         <Brain className="h-12 w-12 text-muted-foreground/30" />
                                         <p className="text-muted-foreground">
-                                            Sin consultas todavía. El agente consulta automáticamente cada 15 min.
+                                            Sin consultas todavía. El agente consulta automáticamente según el intervalo configurado.
                                         </p>
                                     </div>
                                 ) : (
@@ -499,10 +468,9 @@ export default function AiAgentIndex({
     );
 }
 
-function AnalysisItem({ a, highlight }: { a: QuickAnalysis; highlight?: boolean }) {
-    const d = new Date(a.created_at);
-    const signal = a.signal || "neutral";
-    const action = a.suggestion?.action || "none";
+function QuickAnalysisItem({ conv, highlight }: { conv: Conversation; highlight?: boolean }) {
+    const d = new Date(conv.created_at);
+    const hasActions = conv.actions_taken && conv.actions_taken.length > 0;
     const [expanded, setExpanded] = useState(false);
     const [clamped, setClamped] = useState(false);
     const textRef = useRef<HTMLParagraphElement>(null);
@@ -512,38 +480,40 @@ function AnalysisItem({ a, highlight }: { a: QuickAnalysis; highlight?: boolean 
         if (el && !highlight) {
             setClamped(el.scrollHeight > el.clientHeight + 2);
         }
-    }, [a.reasoning, highlight]);
+    }, [conv.summary, highlight]);
 
     return (
-        <div className={`p-4 space-y-1 ${highlight ? "border-l-2 border-primary" : ""}`}>
+        <Link
+            href={`/ai-agent/conversations/${conv.id}`}
+            className={`block p-4 space-y-1 transition-colors hover:bg-muted/20 ${highlight ? "border-l-2 border-primary" : ""}`}
+        >
             <div className="flex items-center gap-2 flex-wrap">
-                <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${signalBg[signal]} ${signalColors[signal]}`}>
-                    {signal}
-                </span>
-                <Badge variant="secondary" className="text-xs">{a.symbol}</Badge>
-                {a.confidence != null && (
-                    <span className="text-xs text-muted-foreground">
-                        {Math.round(a.confidence * 100)}%
+                <Badge variant="secondary" className="text-xs">{conv.bot?.symbol ?? "?"}</Badge>
+                {hasActions ? (
+                    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-yellow-500/10 border-yellow-500/20 text-yellow-400">
+                        {conv.actions_taken!.length} {conv.actions_taken!.length === 1 ? "acción" : "acciones"}
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                        sin cambios
                     </span>
                 )}
-                {action !== "hold" && action !== "none" && (
-                    <Badge variant="outline" className="text-xs">{action}</Badge>
-                )}
+                <span className="text-xs text-muted-foreground">{conv.total_tool_calls} tools</span>
                 <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
                     {formatTimestamp(d)} · {timeAgo(d)}
                 </span>
             </div>
-            {a.reasoning && (
+            {conv.summary && (
                 <div>
                     <p
                         ref={textRef}
                         className={`text-sm text-muted-foreground ${!highlight && !expanded ? "line-clamp-2" : ""}`}
                     >
-                        {a.reasoning}
+                        {conv.summary}
                     </p>
                     {!highlight && clamped && (
                         <button
-                            onClick={() => setExpanded(!expanded)}
+                            onClick={(e) => { e.preventDefault(); setExpanded(!expanded); }}
                             className="text-xs text-primary hover:underline mt-0.5"
                         >
                             {expanded ? "ver menos" : "ver más"}
@@ -551,7 +521,7 @@ function AnalysisItem({ a, highlight }: { a: QuickAnalysis; highlight?: boolean 
                     )}
                 </div>
             )}
-        </div>
+        </Link>
     );
 }
 

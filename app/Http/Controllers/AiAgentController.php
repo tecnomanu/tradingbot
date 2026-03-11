@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AiAgentLog;
 use App\Models\AiConversation;
 use App\Models\Bot;
 use App\Models\BotActionLog;
 use App\Services\Agent\AgentOrchestrator;
-use App\Services\AiTradingAgent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -30,20 +28,11 @@ class AiAgentController extends Controller
             ->limit(50)
             ->get();
 
-        $quickAnalyses = AiAgentLog::with('bot')
-            ->where(function ($q) use ($botIds) {
-                $q->whereIn('bot_id', $botIds)->orWhereNull('bot_id');
-            })
-            ->orderByDesc('created_at')
-            ->limit(30)
-            ->get();
-
         $stats = [
             'total_conversations' => AiConversation::whereIn('bot_id', $botIds)->count(),
             'total_tool_calls' => AiConversation::whereIn('bot_id', $botIds)->sum('total_tool_calls'),
             'total_actions' => BotActionLog::whereIn('bot_id', $botIds)->count(),
             'avg_duration' => round(AiConversation::whereIn('bot_id', $botIds)->avg('duration_ms') ?? 0),
-            'total_quick_analyses' => AiAgentLog::count(),
         ];
 
         $userBots = Bot::where('user_id', $request->user()->id)
@@ -53,7 +42,6 @@ class AiAgentController extends Controller
         return Inertia::render('AiAgent/Index', [
             'conversations' => $conversations,
             'actionLogs' => $actionLogs,
-            'quickAnalyses' => $quickAnalyses,
             'stats' => $stats,
             'userBots' => $userBots,
         ]);
@@ -94,26 +82,6 @@ class AiAgentController extends Controller
         }
 
         return back()->with('error', 'La consulta falló: ' . ($conversation->summary ?? 'Error desconocido'));
-    }
-
-    public function runQuickAnalysis(Request $request)
-    {
-        $request->validate([
-            'bot_id' => 'required|exists:bots,id',
-        ]);
-
-        $bot = Bot::where('id', $request->bot_id)
-            ->where('user_id', $request->user()->id)
-            ->firstOrFail();
-
-        $agent = app(AiTradingAgent::class);
-        $log = $agent->analyzeBot($bot);
-
-        if ($log) {
-            return back()->with('success', "Análisis: {$log->signal} ({$log->confidence}%)");
-        }
-
-        return back()->with('error', 'No se pudo completar el análisis.');
     }
 
     public function updateBotPrompts(Request $request, Bot $bot)

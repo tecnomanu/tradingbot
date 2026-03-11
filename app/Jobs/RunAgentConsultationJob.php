@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Enums\BotStatus;
-use App\Models\AiAgentLog;
 use App\Models\AiConversation;
 use App\Models\Bot;
 use App\Services\Agent\AgentOrchestrator;
@@ -68,28 +67,7 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
             ->latest()
             ->first();
 
-        if (!$lastSuccess || $lastSuccess->ended_at->lt(now()->subMinutes($intervalMinutes))) {
-            return true;
-        }
-
-        // Override: consult sooner if recent analyses show non-neutral signal
-        $recentLogs = AiAgentLog::where('bot_id', $bot->id)
-            ->where('created_at', '>=', now()->subMinutes(min($intervalMinutes, 20)))
-            ->latest()
-            ->limit(3)
-            ->get();
-
-        foreach ($recentLogs as $log) {
-            if ($log->signal !== 'neutral') {
-                return true;
-            }
-            $action = $log->suggestion['action'] ?? 'hold';
-            if (!in_array($action, ['hold', 'adjust_grid'])) {
-                return true;
-            }
-        }
-
-        return false;
+        return !$lastSuccess || $lastSuccess->ended_at->lt(now()->subMinutes($intervalMinutes));
     }
 
     public function tags(): array

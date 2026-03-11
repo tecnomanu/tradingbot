@@ -2,7 +2,6 @@
 
 use App\Jobs\ProcessAllActiveBotsJob;
 use App\Jobs\RunAgentConsultationJob;
-use App\Jobs\RunAiAnalysisJob;
 use App\Jobs\TakePnlSnapshotJob;
 use Illuminate\Support\Facades\Schedule;
 
@@ -15,11 +14,6 @@ Schedule::job(new TakePnlSnapshotJob)
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->name('take-pnl-snapshots');
-
-Schedule::job(new RunAiAnalysisJob)
-    ->everyTenMinutes()
-    ->withoutOverlapping()
-    ->name('run-ai-analysis');
 
 Schedule::job(new RunAgentConsultationJob)
     ->everyFiveMinutes()

@@ -81,12 +81,12 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
                 )}
             </div>
 
-            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 space-y-3">
                 <div>
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    <p className="text-sm font-medium text-amber-400">
                         Rotar API Key
                     </p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    <p className="text-xs text-amber-400/70 mt-1">
                         Genera una nueva key e invalida la anterior de inmediato.
                         Actualizá tu agente/MCP con la nueva key.
                     </p>
@@ -96,7 +96,7 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
                     size="sm"
                     onClick={rotate}
                     disabled={rotating}
-                    className="border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900"
+                    className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                 >
                     <RefreshCw className={`mr-2 h-3.5 w-3.5 ${rotating ? "animate-spin" : ""}`} />
                     {rotating ? "Rotando…" : "Rotar Key"}

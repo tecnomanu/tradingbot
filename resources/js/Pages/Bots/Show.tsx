@@ -1164,6 +1164,7 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                     </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    {/* 1. Style presets */}
                     <div className="space-y-3">
                         <Label>Estilo de Trading</Label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1197,6 +1198,7 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                         </button>
                     </div>
 
+                    {/* 2. Custom textarea (only when Personalizado is selected) */}
                     {showCustom && (
                         <div className="space-y-2">
                             <Label htmlFor="custom-prompt">Personalidad personalizada</Label>
@@ -1214,13 +1216,23 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                         </div>
                     )}
 
-                    {!showCustom && (
-                        <div className="rounded-lg bg-muted/50 p-3">
-                            <p className="text-xs text-muted-foreground mb-2 font-medium">Vista previa del estilo activo:</p>
-                            <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{currentPrompt}</pre>
-                        </div>
-                    )}
+                    {/* 3. User message */}
+                    <div className="space-y-2">
+                        <Label htmlFor="user-prompt">Mensaje Inicial</Label>
+                        <Textarea
+                            id="user-prompt"
+                            value={userPrompt}
+                            onChange={(e) => { setUserPrompt(e.target.value); setSaved(false); }}
+                            placeholder={DEFAULT_USER_PROMPT}
+                            rows={3}
+                            className="font-mono text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            El mensaje que recibe el agente en cada consulta. Variables: <code className="text-xs bg-muted px-1 rounded">{"{bot_id}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{symbol}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{now}"}</code>
+                        </p>
+                    </div>
 
+                    {/* 4. Consultation interval */}
                     <div className="space-y-2">
                         <Label>Intervalo de consulta</Label>
                         <div className="flex flex-wrap gap-2">
@@ -1244,6 +1256,10 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                         </p>
                     </div>
 
+                    {/* Divider */}
+                    <hr className="border-border" />
+
+                    {/* 5. Telegram notifications */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div>
@@ -1300,21 +1316,7 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                         )}
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="user-prompt">Mensaje Inicial</Label>
-                        <Textarea
-                            id="user-prompt"
-                            value={userPrompt}
-                            onChange={(e) => { setUserPrompt(e.target.value); setSaved(false); }}
-                            placeholder={DEFAULT_USER_PROMPT}
-                            rows={3}
-                            className="font-mono text-sm"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            El mensaje que recibe el agente en cada consulta. Variables: <code className="text-xs bg-muted px-1 rounded">{"{bot_id}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{symbol}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{now}"}</code>
-                        </p>
-                    </div>
-
+                    {/* Save / Test buttons */}
                     <div className="flex flex-wrap gap-2">
                         <Button onClick={handleSave} disabled={saving} className="gap-1.5">
                             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
