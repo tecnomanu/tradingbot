@@ -57,6 +57,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/telegram/link-token', [TelegramController::class, 'generateLinkToken'])->name('telegram.link-token');
     Route::post('/telegram/disconnect', [TelegramController::class, 'disconnect'])->name('telegram.disconnect');
     Route::post('/telegram/test', [TelegramController::class, 'testMessage'])->name('telegram.test');
+    Route::post('/telegram/poll', [TelegramController::class, 'pollUpdates'])->name('telegram.poll');
+    Route::post('/telegram/set-chat-id', [TelegramController::class, 'setChatId'])->name('telegram.set-chat-id');
     Route::post('/telegram/setup-webhook', [TelegramController::class, 'setupWebhook'])->name('telegram.setup-webhook');
 });
 

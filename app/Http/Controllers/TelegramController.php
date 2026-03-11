@@ -124,7 +124,84 @@ class TelegramController extends Controller
     }
 
     /**
-     * Setup the webhook (admin utility).
+     * Poll Telegram getUpdates for /start messages and link matching users.
+     * Useful when webhook is not available (no HTTPS).
+     */
+    public function pollUpdates(Request $request): JsonResponse
+    {
+        $token = config('services.telegram.bot_token');
+        if (!$token) {
+            return response()->json(['error' => 'Bot token not configured'], 422);
+        }
+
+        $response = \Illuminate\Support\Facades\Http::get(
+            "https://api.telegram.org/bot{$token}/getUpdates",
+            ['timeout' => 5]
+        );
+
+        $updates = $response->json('result') ?? [];
+        $linked = 0;
+
+        foreach ($updates as $update) {
+            $message = $update['message'] ?? null;
+            if (!$message || empty($message['text'])) continue;
+
+            $text = trim($message['text']);
+            if (!str_starts_with($text, '/start')) continue;
+
+            $chatId = (string) $message['chat']['id'];
+            $linkToken = trim(str_replace('/start', '', $text));
+
+            if (empty($linkToken)) continue;
+
+            $user = User::where('telegram_link_token', $linkToken)->first();
+            if ($user) {
+                $user->update([
+                    'telegram_chat_id' => $chatId,
+                    'telegram_link_token' => null,
+                ]);
+                $this->telegram->sendMessage($chatId,
+                    "✅ <b>Conectado!</b>\n\nTu cuenta de GridBot fue vinculada exitosamente."
+                );
+                $linked++;
+            }
+        }
+
+        // Clear processed updates
+        if (!empty($updates)) {
+            $lastUpdateId = end($updates)['update_id'];
+            \Illuminate\Support\Facades\Http::get(
+                "https://api.telegram.org/bot{$token}/getUpdates",
+                ['offset' => $lastUpdateId + 1]
+            );
+        }
+
+        $user = $request->user();
+        return response()->json([
+            'linked' => $linked,
+            'connected' => !empty($user->fresh()->telegram_chat_id),
+            'chat_id' => $user->fresh()->telegram_chat_id,
+        ]);
+    }
+
+    /**
+     * Manually set chat ID.
+     */
+    public function setChatId(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'chat_id' => 'required|string|max:50',
+        ]);
+
+        $request->user()->update([
+            'telegram_chat_id' => $data['chat_id'],
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Setup the webhook (admin utility, requires HTTPS domain).
      */
     public function setupWebhook(Request $request): JsonResponse
     {
