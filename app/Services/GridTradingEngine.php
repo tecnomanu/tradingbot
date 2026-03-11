@@ -46,7 +46,14 @@ class GridTradingEngine
             throw new Exception("Cannot get current price for {$bot->symbol}");
         }
 
-        $this->placeInitialOrders($bot, $currentPrice);
+        $hasOpenOrders = $bot->orders()->where('status', OrderStatus::Open)->exists();
+
+        if ($hasOpenOrders) {
+            $this->placeInitialOrders($bot, $currentPrice);
+        } else {
+            Log::info('GridEngine: no open orders, rebuilding grid from scratch', ['bot_id' => $bot->id]);
+            $this->rebuildGrid($bot, $currentPrice);
+        }
 
         $this->botRepository->update($bot, [
             'status' => BotStatus::Active,
@@ -364,10 +371,9 @@ class GridTradingEngine
                 $pnl = round($gridStep * $realQty - $commission, 4);
             }
 
-            $order->update(['pnl' => $pnl]);
-
             if ($counterLevel === null || !isset($gridLevels[$counterLevel])) {
-                Log::info('GridEngine: no counter level available', [
+                $order->update(['pnl' => $pnl]);
+                Log::info('GridEngine: no counter level available (edge of grid)', [
                     'bot_id' => $bot->id,
                     'filled_level' => $order->grid_level,
                     'counter_level' => $counterLevel,
@@ -382,6 +388,7 @@ class GridTradingEngine
                 ->exists();
 
             if ($existingOpen) {
+                $order->update(['pnl' => $pnl]);
                 Log::info('GridEngine: counter-order skipped (already exists)', [
                     'bot_id' => $bot->id,
                     'counter_level' => $counterLevel,
@@ -391,7 +398,17 @@ class GridTradingEngine
             }
 
             $counterPrice = $gridLevels[$counterLevel];
-            $this->placeCounterOrder($bot, $account, $counterSide, $counterLevel, $counterPrice, $quantityPerGrid);
+            $placed = $this->placeCounterOrder($bot, $account, $counterSide, $counterLevel, $counterPrice, $quantityPerGrid);
+
+            if ($placed) {
+                $order->update(['pnl' => $pnl]);
+            } else {
+                Log::warning('GridEngine: counter-order failed, will retry next cycle', [
+                    'bot_id' => $bot->id,
+                    'filled_order_id' => $order->id,
+                    'counter_level' => $counterLevel,
+                ]);
+            }
         }
     }
 
@@ -405,13 +422,13 @@ class GridTradingEngine
         int $gridLevel,
         float $price,
         float $quantity,
-    ): void {
+    ): bool {
         $binanceSide = $side === OrderSide::Buy ? 'BUY' : 'SELL';
         $formattedQty = $this->binance->formatQuantity($bot->symbol, $quantity);
         $formattedPrice = $this->binance->formatPrice($bot->symbol, $price);
 
         if ($formattedQty <= 0) {
-            return;
+            return false;
         }
 
         try {
@@ -442,12 +459,16 @@ class GridTradingEngine
                 'grid_level' => $gridLevel,
                 'price' => $formattedPrice,
             ]);
+
+            return true;
         } catch (Exception $e) {
             Log::error('GridEngine: failed to place counter-order', [
                 'bot_id' => $bot->id,
                 'grid_level' => $gridLevel,
                 'error' => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 
@@ -510,6 +531,91 @@ class GridTradingEngine
         ]);
 
         Log::info('GridEngine: bot stopped', ['bot_id' => $bot->id]);
+    }
+
+    /**
+     * Rebuild the entire grid from the bot's existing config.
+     * Used when restarting a stopped bot that has no Open orders.
+     */
+    private function rebuildGrid(Bot $bot, float $currentPrice): void
+    {
+        $account = $bot->binanceAccount;
+
+        $gridConfig = $this->gridCalculator->calculateFullGridConfig([
+            'price_lower' => $bot->price_lower,
+            'price_upper' => $bot->price_upper,
+            'grid_count' => $bot->grid_count,
+            'investment' => $bot->investment,
+            'leverage' => $bot->leverage,
+            'side' => $bot->side->value,
+        ]);
+
+        $gridLevels = $gridConfig['grid_levels'];
+        $quantity = $gridConfig['quantity_per_grid'];
+        $now = now();
+        $orders = [];
+
+        foreach ($gridLevels as $level => $price) {
+            $side = $price < $currentPrice ? OrderSide::Buy : OrderSide::Sell;
+            $orders[] = [
+                'bot_id' => $bot->id,
+                'side' => $side->value,
+                'status' => OrderStatus::Open->value,
+                'price' => $price,
+                'quantity' => $quantity,
+                'grid_level' => $level,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        $this->orderRepository->createMany($orders);
+
+        $newOrders = $bot->orders()
+            ->where('status', OrderStatus::Open)
+            ->where('created_at', '>=', $now)
+            ->orderBy('price')
+            ->get();
+
+        $placedCount = 0;
+
+        foreach ($newOrders as $order) {
+            $binanceSide = $order->side === OrderSide::Buy ? 'BUY' : 'SELL';
+            $qty = $this->binance->formatQuantity($bot->symbol, $order->quantity);
+            $formattedPrice = $this->binance->formatPrice($bot->symbol, $order->price);
+
+            if ($qty <= 0) {
+                continue;
+            }
+
+            try {
+                $clientOrderId = "grid_{$bot->id}_{$order->grid_level}";
+                $result = $this->binance->placeLimitOrder(
+                    $account, $bot->symbol, $binanceSide, $qty, $formattedPrice, $clientOrderId
+                );
+
+                $order->update([
+                    'binance_order_id' => (string) $result['orderId'],
+                    'status' => OrderStatus::Open,
+                    'quantity' => $qty,
+                    'price' => $formattedPrice,
+                ]);
+                $placedCount++;
+            } catch (Exception $e) {
+                Log::error('GridEngine: failed to place rebuilt grid order', [
+                    'bot_id' => $bot->id,
+                    'grid_level' => $order->grid_level,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('GridEngine: grid rebuilt', [
+            'bot_id' => $bot->id,
+            'range' => "{$bot->price_lower}-{$bot->price_upper}",
+            'placed' => $placedCount,
+            'total' => $newOrders->count(),
+        ]);
     }
 
     /**
