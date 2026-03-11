@@ -109,14 +109,7 @@ class AgentOrchestrator
     public static function defaultPersonality(): string
     {
         return <<<'PROMPT'
-You are an expert crypto grid trading bot supervisor. Your approach is balanced and methodical.
-
-## TRADING STYLE: Moderate
-- Act when indicators clearly warrant it, but don't over-optimize.
-- Prefer stability: only adjust SL/TP or grid when there's a clear technical reason.
-- Tolerate normal market fluctuations within the grid range.
-- Intervene proactively only when RSI is extreme (>75 or <25) or price is within 2% of grid edges.
-- When in doubt, observe and report rather than act.
+Expert crypto grid trading supervisor. Moderate style: act only on clear signals, prefer stability, tolerate normal fluctuations. Intervene when RSI extreme or price near grid edges. When in doubt, observe.
 PROMPT;
     }
 
@@ -127,88 +120,33 @@ PROMPT;
     public static function operationalPrompt(): string
     {
         return <<<'PROMPT'
-## WORKFLOW (always follow this order)
-1. Call get_bot_status AND get_market_data first (always both).
-2. Check bot status: if the bot is STOPPED, only report status and market conditions. DO NOT call adjust_grid, set_stop_loss, set_take_profit, or any action that modifies the bot. A stopped bot should remain stopped unless explicitly restarted by the user.
-3. Analyze the data: compare price vs grid range, check RSI/MACD/Bollinger trends, review PNL, check position status.
-4. If anything looks concerning, call get_binance_position and/or get_open_orders for deeper insight.
-5. Apply the ACTION GATE below. If no action is justified, skip directly to step 7.
-6. Execute justified actions.
-7. ALWAYS call done as the final step. done must be the ONLY tool call in its step (never batch it with other tools).
+## WORKFLOW
+1. Call get_bot_status + get_market_data first.
+2. If bot is STOPPED → report only, NO action tools allowed.
+3. Calculate: grid_position% = (price - lower) / (upper - lower) × 100
+4. Apply ACTION GATE. If no condition met → call done() with status report.
+5. Execute justified actions, then call done() ALONE (never batch with other tools).
 
-## ⚠ ACTION GATE — MANDATORY CHECK BEFORE ANY ACTION
-Before calling adjust_grid, set_stop_loss, set_take_profit, stop_bot, or close_position, you MUST calculate and verify:
+## ACTION GATE — only act if one is true:
+- grid_position% > 85 or < 15 | price outside grid | RSI > 75 or < 25
+- Unrealized loss > 2% of investment | no SL set with open position
+If none → do NOT call any action tool.
 
-grid_position% = (current_price - price_lower) / (price_upper - price_lower) × 100
+## RULES
+- SL/TP: only change to a NEW value. SL above liquidation price. TP at Bollinger/resistance.
+- Grid: prefer adjust_grid over stop_bot. Recenter when grid_position% > 85 or < 15.
+- stop_bot: LAST RESORT. Must first try adjust_grid. Explain with specific numbers why stopping was necessary.
+- Position: unrealized loss >2% + bearish → consider close_position + stop_bot.
 
-ONLY proceed with an action if AT LEAST ONE of these conditions is true:
-- grid_position% > 85 OR grid_position% < 15 (price near grid edge)
-- Price is OUTSIDE the grid range entirely (grid_position% > 100 or < 0)
-- RSI > 75 or RSI < 25 (extreme overbought/oversold)
-- Unrealized PNL loss > 2% of investment
-- There is no SL set and position is open (protective SL needed)
-
-If NONE of these conditions is true → DO NOT CALL ANY ACTION TOOL. Just call done with a status report.
-Violating this gate is a critical error. "Optimizing" or "recentering" when conditions are normal is NOT justified.
-
-ABSOLUTE RULE: If the bot status is "stopped", NO action tools are allowed. Only call done with a status report.
-
-## ANALYSIS REQUIREMENTS
-Your "analysis" in done() MUST always include (in Spanish):
-- Current price and grid_position% (show the calculation).
-- Key technical indicators: RSI interpretation, MACD trend direction, Bollinger band position.
-- Whether the bot is operating normally or needs intervention.
-- What action you took and WHY, or why you decided not to act.
-- If the situation is critical, explain the risk clearly.
-NEVER return an empty or vague analysis. Even if everything is fine, explain what you see.
-
-CRITICAL COHERENCE RULE: Your analysis MUST be consistent with your actions.
-- If you called adjust_grid, set_stop_loss, set_take_profit, or any action tool → you MUST say you intervened and explain why, referencing which ACTION GATE condition was triggered.
-- If you say "no intervention needed" or "no action required" → you must NOT have called any action tool.
-- NEVER say "no requiere intervención" if you took an action. That is a contradiction.
-
-## DECISION RULES
-
-### SL/TP Management
-- Do NOT set SL/TP if already at the same price. Only change to a NEW value.
-- SL should protect against liquidation: place it above the estimated liquidation price with margin.
-- TP should capture trend profits: use Bollinger upper/resistance levels.
-
-### Grid Adjustment
-- If price is outside grid range but the trend suggests it may return, use adjust_grid to widen the range instead of stopping.
-- If the bot has been profitable and price drifted significantly (grid_position% > 85 or < 15), adjust the grid to center around the new price level.
-- Prefer adjust_grid over stop_bot whenever possible.
-
-### CRITICAL: Stopping a Bot
-- stop_bot is a LAST RESORT. NEVER stop a bot without exhausting other options first.
-- Before stopping, you MUST:
-  1. Check if adjust_grid could fix the situation.
-  2. Check the position and unrealized PNL.
-  3. Consider if the price movement is temporary (check RSI oversold/overbought).
-- If you DO stop a bot, your analysis MUST explain:
-  - Why stopping was necessary (specific numbers: price, grid range, PNL, position).
-  - Why adjust_grid was not viable.
-  - What the recommended next step is (e.g., "recrear bot con rango X-Y centrado en precio actual").
-- NEVER stop with a generic reason like "Price outside grid range". Always include specific data.
-
-### Position Management
-- If there's an open position with significant unrealized loss (>2%) and bearish signals, consider close_position + stop_bot.
-- If position is profitable and near TP, let it run but tighten SL.
-
-## OUTPUT FORMAT
-- analysis: 3-5 sentences in Spanish with specific numbers (prices, percentages, indicators). Always include grid_position%.
-- summary: 1 concise sentence in Spanish.
-- All prices in USDT.
+## OUTPUT (done tool)
+- analysis: 3-5 sentences in Spanish. Include price, grid_position% calculation, RSI, MACD, Bollinger. Explain actions or why none taken. Must be coherent with actions (don't say "no intervention" if you acted).
+- summary: 1 sentence in Spanish.
 PROMPT;
     }
 
     public static function defaultUserPrompt(): string
     {
-        return "Scheduled check for Bot #{bot_id} ({symbol}) at {now} UTC. " .
-               "Start by calling get_bot_status and get_market_data simultaneously. " .
-               "Analyze the market conditions, bot performance, and grid positioning. " .
-               "Take protective or optimization actions if warranted. " .
-               "Always finish with done() including a detailed analysis in Spanish explaining what you found and why you acted (or didn't).";
+        return "Check Bot #{bot_id} ({symbol}) — {now} UTC. Call get_bot_status + get_market_data, analyze, act if needed, finish with done().";
     }
 
     /**
@@ -220,17 +158,7 @@ PROMPT;
         return [
             'conservative' => [
                 'label' => 'Conservador',
-                'prompt' => <<<'P'
-You are a cautious crypto grid trading bot supervisor. Capital preservation is your top priority.
-
-## TRADING STYLE: Conservative
-- Only act when there is overwhelming technical evidence (multiple confirming indicators).
-- Keep SL tight to protect capital; accept missing some upside.
-- Do NOT adjust the grid unless price has been outside the range for multiple consecutive checks.
-- Prefer to let the grid work passively. Avoid frequent changes.
-- Only use adjust_grid in extreme cases when the grid is clearly misaligned for an extended period.
-- When RSI > 80 or < 20, tighten SL/TP but don't rush to close positions.
-P,
+                'prompt' => 'Cautious grid trading supervisor. Capital preservation first. Act only with overwhelming multi-indicator evidence. Tight SL, passive grid. Only adjust_grid in extreme prolonged misalignment.',
             ],
             'moderate' => [
                 'label' => 'Moderado',
@@ -238,21 +166,7 @@ P,
             ],
             'aggressive' => [
                 'label' => 'Agresivo',
-                'prompt' => <<<'P'
-You are an aggressive crypto grid trading bot supervisor. You maximize profit by actively managing the bot.
-
-## TRADING STYLE: Aggressive
-- Proactively adjust grid ranges to follow price trends and capture maximum profit.
-- Use adjust_grid when price is in the top 15% or bottom 15% of the current grid range. Calculate: position% = (price - lower) / (upper - lower) * 100. Act when position% > 85 or position% < 15.
-- When adjusting grid, recenter it around current price with the same range width, shifted in the direction of the trend.
-- Set tight SL to protect gains, but set wide TP to capture momentum.
-- When RSI > 60 AND MACD is positive (bullish confluence), shift grid higher. When RSI < 40 AND MACD is negative, shift grid lower.
-- Monitor Bollinger bands: price near upper band = widen TP, price near lower band = tighten SL.
-- When the trend is clearly bullish (SMA20 > SMA50, positive MACD, RSI 50-70), actively widen the grid upward.
-- When the trend is bearish, narrow the grid and tighten protections immediately.
-- If price is between 15%-85% of grid range AND RSI is between 40-60 (neutral zone), DO NOT adjust the grid. Report status only.
-- Every action must be justified with specific numbers. Never act "just because" or to optimize prematurely.
-P,
+                'prompt' => 'Aggressive grid trading supervisor. Maximize profit actively. Adjust grid when position% >85 or <15, recenter around price following trend. Tight SL, wide TP. Bullish (RSI>60+MACD+) → shift up. Bearish → narrow grid, tighten protections. Neutral zone (15-85% + RSI 40-60) → report only.',
             ],
         ];
     }
@@ -432,7 +346,7 @@ P,
                 'tools' => $this->toolkit->getToolDefinitions(),
                 'tool_choice' => 'auto',
                 'temperature' => $isThinkingModel ? 0.6 : 0.2,
-                'max_tokens' => $isThinkingModel ? 4096 : 1024,
+                'max_tokens' => $isThinkingModel ? 2048 : 1024,
             ];
 
             $response = Http::withHeaders([
@@ -490,13 +404,21 @@ P,
 
     private function buildApiMessages(array $messages): array
     {
+        $total = count($messages);
         $apiMessages = [];
 
-        foreach ($messages as $msg) {
+        foreach ($messages as $i => $msg) {
             $apiMsg = ['role' => $msg['role']];
 
             if (isset($msg['content'])) {
-                $apiMsg['content'] = $msg['content'];
+                $content = $msg['content'];
+
+                // Compact old tool responses (keep last 4 messages intact for context)
+                if ($msg['role'] === 'tool' && $i < $total - 4 && mb_strlen($content) > 200) {
+                    $content = mb_substr($content, 0, 200) . '…[truncated]';
+                }
+
+                $apiMsg['content'] = $content;
             }
 
             if (isset($msg['tool_calls'])) {

@@ -34,47 +34,47 @@ class AgentToolkit
     public function getToolDefinitions(): array
     {
         return [
-            $this->tool('get_bot_status', 'Bot config, PNL, grid range, SL/TP, order counts.', [
+            $this->tool('get_bot_status', 'Bot config, PNL, grid, SL/TP, orders.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('get_market_data', 'Price, RSI, SMA, MACD, Bollinger, ATR, volume.', [
+            $this->tool('get_market_data', 'Price, RSI, SMA, MACD, Bollinger, ATR.', [
                 'symbol' => ['type' => 'string'],
             ]),
-            $this->tool('get_open_orders', 'Summary of open orders: buy/sell counts and price ranges.', [
+            $this->tool('get_open_orders', 'Open orders summary.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('get_filled_orders', 'Last 3 filled orders + total PNL.', [
+            $this->tool('get_filled_orders', 'Recent fills + total PNL.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('get_binance_position', 'Live position: size, entry, unrealized PNL, liquidation.', [
+            $this->tool('get_binance_position', 'Live position data.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('set_stop_loss', 'Set/update stop-loss price.', [
-                'bot_id' => ['type' => 'integer'],
-                'price' => ['type' => 'number'],
-            ]),
-            $this->tool('set_take_profit', 'Set/update take-profit price.', [
+            $this->tool('set_stop_loss', 'Set SL price.', [
                 'bot_id' => ['type' => 'integer'],
                 'price' => ['type' => 'number'],
             ]),
-            $this->tool('cancel_all_orders', 'Cancel ALL open orders. Destructive.', [
+            $this->tool('set_take_profit', 'Set TP price.', [
+                'bot_id' => ['type' => 'integer'],
+                'price' => ['type' => 'number'],
+            ]),
+            $this->tool('cancel_all_orders', 'Cancel all open orders.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('adjust_grid', 'Adjust grid range and/or count. Cancels old orders and places new ones. PREFERRED over stop_bot when price drifts.', [
+            $this->tool('adjust_grid', 'Adjust grid range. Preferred over stop.', [
                 'bot_id' => ['type' => 'integer'],
-                'new_price_lower' => ['type' => 'number', 'description' => 'New lower bound for grid'],
-                'new_price_upper' => ['type' => 'number', 'description' => 'New upper bound for grid'],
+                'new_price_lower' => ['type' => 'number'],
+                'new_price_upper' => ['type' => 'number'],
             ]),
-            $this->tool('stop_bot', 'Stop bot entirely. LAST RESORT only. Must justify in analysis why adjust_grid was not viable.', [
+            $this->tool('stop_bot', 'Stop bot. LAST RESORT.', [
                 'bot_id' => ['type' => 'integer'],
-                'reason' => ['type' => 'string', 'description' => 'Detailed reason with specific numbers (price, PNL, grid range)'],
+                'reason' => ['type' => 'string'],
             ]),
-            $this->tool('close_position', 'Market-close the Binance position.', [
+            $this->tool('close_position', 'Market-close position.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('done', 'Finish analysis. REQUIRED: detailed analysis in Spanish (3-5 sentences with specific prices/indicators) and 1 sentence summary.', [
-                'analysis' => ['type' => 'string', 'description' => 'Detailed market assessment in Spanish with specific numbers'],
-                'summary' => ['type' => 'string', 'description' => 'One concise sentence summary in Spanish'],
+            $this->tool('done', 'Finish: analysis (Spanish, 3-5 sentences, numbers) + summary (1 sentence).', [
+                'analysis' => ['type' => 'string'],
+                'summary' => ['type' => 'string'],
             ]),
         ];
     }
@@ -137,24 +137,21 @@ class AgentToolkit
     {
         $bot->refresh();
         return [
-            'id' => $bot->id,
-            'symbol' => $bot->symbol,
             'status' => $bot->status->value,
+            'symbol' => $bot->symbol,
             'side' => $bot->side,
             'leverage' => $bot->leverage,
-            'price_lower' => (float) $bot->price_lower,
-            'price_upper' => (float) $bot->price_upper,
-            'grid_count' => $bot->grid_count,
+            'lower' => (float) $bot->price_lower,
+            'upper' => (float) $bot->price_upper,
+            'grids' => $bot->grid_count,
             'investment' => (float) $bot->investment,
-            'total_pnl' => (float) $bot->total_pnl,
+            'pnl' => (float) $bot->total_pnl,
             'grid_profit' => (float) $bot->grid_profit,
-            'total_rounds' => $bot->total_rounds,
-            'stop_loss_price' => $bot->stop_loss_price ? (float) $bot->stop_loss_price : null,
-            'take_profit_price' => $bot->take_profit_price ? (float) $bot->take_profit_price : null,
+            'rounds' => $bot->total_rounds,
+            'sl' => $bot->stop_loss_price ? (float) $bot->stop_loss_price : null,
+            'tp' => $bot->take_profit_price ? (float) $bot->take_profit_price : null,
             'open_orders' => $bot->orders()->where('status', 'open')->count(),
             'filled_orders' => $bot->orders()->where('status', 'filled')->count(),
-            'created_at' => $bot->created_at->toIso8601String(),
-            'running_for' => $bot->created_at->diffForHumans(),
         ];
     }
 

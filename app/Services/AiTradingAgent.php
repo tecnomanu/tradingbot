@@ -88,20 +88,17 @@ class AiTradingAgent
                 : 0;
 
             return [
-                'symbol' => $symbol,
-                'current_price' => round($currentPrice, 2),
-                'price_change_24h' => round($priceChange24h, 2),
-                'rsi_14' => round($rsi, 2),
-                'sma_20' => round($sma20, 2),
-                'sma_50' => round($sma50, 2),
+                'price' => round($currentPrice, 2),
+                'chg24h' => round($priceChange24h, 2),
+                'rsi' => round($rsi, 2),
+                'sma20' => round($sma20, 2),
+                'sma50' => round($sma50, 2),
                 'macd' => round($macd, 2),
-                'volume_ratio' => round($currentVolume / max($avgVolume, 1), 2),
-                'atr_14' => round($atr, 2),
-                'bollinger_upper' => round($bollingerBands['upper'], 2),
-                'bollinger_lower' => round($bollingerBands['lower'], 2),
-                'bollinger_middle' => round($bollingerBands['middle'], 2),
-                'last_5_closes' => array_map(fn($c) => round($c, 2), array_slice($closes, -5)),
-                'timestamp' => now()->toIso8601String(),
+                'vol_ratio' => round($currentVolume / max($avgVolume, 1), 2),
+                'atr' => round($atr, 2),
+                'bb_upper' => round($bollingerBands['upper'], 2),
+                'bb_lower' => round($bollingerBands['lower'], 2),
+                'bb_mid' => round($bollingerBands['middle'], 2),
             ];
         } catch (\Exception $e) {
             Log::error('AiTradingAgent: gatherMarketData failed', [
