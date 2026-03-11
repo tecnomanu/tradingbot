@@ -10,8 +10,14 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { Bot } from "@/types/bot";
+import {
+    leverageLabel,
+    modeBadgeClass,
+    modeLabel,
+    sideBadgeClass,
+    sideLabel,
+} from "@/utils/botBadges";
 import { Link, router } from "@inertiajs/react";
 import {
     Tooltip,
@@ -151,30 +157,16 @@ function BotRow({ bot }: { bot: Bot }) {
                             {bot.symbol.replace("USDT", "/USDT")} Grid Bot
                         </span>
                         <div className="flex items-center gap-1 mt-0.5">
-                            <span className={cn(
-                                "text-[10px] px-1 py-0.5 rounded",
-                                isFutures
-                                    ? "bg-blue-500/15 text-blue-500"
-                                    : "bg-emerald-500/15 text-emerald-500",
-                            )}>
-                                {isFutures ? "Futures" : "Spot"}
+                            <span className={modeBadgeClass(isFutures)}>
+                                {modeLabel(isFutures)}
                             </span>
                             {isFutures && (
-                                <span className="text-[10px] text-muted-foreground">
-                                    {bot.leverage}x
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
+                                    {leverageLabel(bot.leverage)}
                                 </span>
                             )}
-                            <span
-                                className={cn(
-                                    "text-[10px] px-1 py-0.5 rounded",
-                                    bot.side === "long"
-                                        ? "bg-green-500/15 text-green-500"
-                                        : bot.side === "short"
-                                          ? "bg-red-500/15 text-red-500"
-                                          : "bg-yellow-500/15 text-yellow-500",
-                                )}
-                            >
-                                {bot.side === "long" ? "Long" : bot.side === "short" ? "Short" : "Neutral"}
+                            <span className={sideBadgeClass(bot.side)}>
+                                {sideLabel(bot.side)}
                             </span>
                         </div>
                     </div>

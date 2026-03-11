@@ -1,4 +1,11 @@
 import { cn } from "@/lib/utils";
+import {
+    leverageLabel,
+    modeBadgeClass,
+    modeLabel,
+    sideBadgeClass,
+    sideLabel,
+} from "@/utils/botBadges";
 import { useState } from "react";
 
 export interface BotPreviewData {
@@ -62,24 +69,14 @@ export default function BotPreviewPanel({ data, className }: BotPreviewPanelProp
                 <Row label="Par" value={data.symbol.replace("USDT", "/USDT")} className="text-foreground font-medium" />
 
                 <Row label="Modo">
-                    <span className={cn(
-                        "font-medium px-1 rounded",
-                        data.botMode === "futures"
-                            ? "text-blue-400 bg-blue-500/10"
-                            : "text-emerald-400 bg-emerald-500/10",
-                    )}>
-                        {data.botMode === "futures" ? "Futures" : "Spot"}
+                    <span className={modeBadgeClass(data.botMode === "futures")}>
+                        {modeLabel(data.botMode === "futures")}
                     </span>
                 </Row>
 
                 <Row label="Dirección">
-                    <span className={cn(
-                        "font-medium",
-                        data.side === "long" ? "text-green-500"
-                            : data.side === "short" ? "text-red-500"
-                            : "text-foreground",
-                    )}>
-                        {data.side === "long" ? "Long" : data.side === "short" ? "Short" : "Neutral"}
+                    <span className={sideBadgeClass(data.side)}>
+                        {sideLabel(data.side)}
                     </span>
                 </Row>
 
@@ -110,7 +107,7 @@ export default function BotPreviewPanel({ data, className }: BotPreviewPanelProp
                 <Row label="Inversión" value={`${data.investment} USDT`} className="text-foreground tabular-nums" />
 
                 {data.botMode === "futures" && Number(data.leverage) > 1 && (
-                    <Row label="Leverage" value={`${data.leverage}x`} className="text-foreground tabular-nums" />
+                    <Row label="Leverage" value={leverageLabel(data.leverage)} className="text-foreground tabular-nums" />
                 )}
 
                 <Row label="Grid">

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { BinanceAccount } from "@/types/bot";
+import { sideColor, sideLabel } from "@/utils/botBadges";
 import { LEVERAGE_OPTIONS } from "@/utils/constants";
 import { Link } from "@inertiajs/react";
 import { ChevronDown, Info, Loader2 } from "lucide-react";
@@ -218,30 +219,25 @@ export default function BotFormAdvanced({
                     <div className="space-y-1.5">
                         <div className="flex bg-muted/50 p-0.5 rounded-lg">
                             {(["long", "short", "neutral"] as const).map(
-                                (side) => (
-                                    <button
-                                        key={side}
-                                        onClick={() =>
-                                            setData("side", side)
-                                        }
-                                        className={cn(
-                                            "flex-1 text-xs py-1.5 rounded-md transition-all font-medium",
-                                            data.side === side
-                                                ? side === "long"
-                                                    ? "bg-green-500 text-white shadow-sm"
-                                                    : side === "short"
-                                                      ? "bg-red-500 text-white shadow-sm"
-                                                      : "bg-background text-foreground shadow-sm"
-                                                : "text-muted-foreground hover:text-foreground",
-                                        )}
-                                    >
-                                        {side === "long"
-                                            ? "Long"
-                                            : side === "short"
-                                              ? "Short"
-                                              : "Neutral"}
-                                    </button>
-                                ),
+                                (side) => {
+                                    const colors = sideColor(side);
+                                    return (
+                                        <button
+                                            key={side}
+                                            onClick={() =>
+                                                setData("side", side)
+                                            }
+                                            className={cn(
+                                                "flex-1 text-xs py-1.5 rounded-md transition-all font-medium",
+                                                data.side === side
+                                                    ? cn(colors.bg, colors.text, "shadow-sm ring-1 ring-current/20")
+                                                    : "text-muted-foreground hover:text-foreground",
+                                            )}
+                                        >
+                                            {sideLabel(side)}
+                                        </button>
+                                    );
+                                },
                             )}
                         </div>
                     </div>

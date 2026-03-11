@@ -24,6 +24,13 @@ import {
     OrderStats,
 } from "@/types/bot";
 import {
+    leverageLabel,
+    modeBadgeClass,
+    modeLabel,
+    sideBadgeClass,
+    sideLabel as sideLabelBadge,
+} from "@/utils/botBadges";
+import {
     formatCurrency,
     formatDate,
     sideLabel,
@@ -124,8 +131,7 @@ export default function Show({
                         <div>
                             <div className="flex items-center gap-3">
                                 <h1 className="text-xl font-bold tracking-tight">
-                                    {bot.symbol.replace("USDT", "/USDT")} Grid
-                                    Bot de Futuros
+                                    {bot.symbol.replace("USDT", "/USDT")} Grid Bot
                                 </h1>
                                 <Badge
                                     variant={
@@ -138,9 +144,17 @@ export default function Show({
                                 >
                                     {statusLabel(bot.status)}
                                 </Badge>
-                                <Badge variant="outline">
-                                    {bot.leverage}x {sideLabel(bot.side)}
-                                </Badge>
+                                <span className={modeBadgeClass(Number(bot.leverage) > 1, "sm")}>
+                                    {modeLabel(Number(bot.leverage) > 1)}
+                                </span>
+                                <span className={sideBadgeClass(bot.side, "sm")}>
+                                    {sideLabelBadge(bot.side)}
+                                </span>
+                                {Number(bot.leverage) > 1 && (
+                                    <span className="text-xs text-muted-foreground tabular-nums">
+                                        {leverageLabel(bot.leverage)}
+                                    </span>
+                                )}
                             </div>
                             <p className="text-sm text-muted-foreground">
                                 {bot.name} · Creado {formatDate(bot.created_at)}
