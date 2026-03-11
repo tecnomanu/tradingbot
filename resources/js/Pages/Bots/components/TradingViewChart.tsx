@@ -21,6 +21,21 @@ export interface ChartOrder {
     filled_at_fmt?: string;
 }
 
+export interface BotPreview {
+    symbol: string;
+    side: string;
+    priceLower?: number;
+    priceUpper?: number;
+    gridCount?: number;
+    investment: string;
+    leverage: string;
+    slippage: string;
+    stopLoss?: string;
+    takeProfit?: string;
+    gridMode: string;
+    botMode: string;
+}
+
 interface TradingViewChartProps {
     symbol: string;
     lowerPrice?: number;
@@ -28,6 +43,7 @@ interface TradingViewChartProps {
     gridCount?: number;
     side?: string;
     orders?: ChartOrder[];
+    botPreview?: BotPreview;
 }
 
 const INTERVALS = [
@@ -66,8 +82,8 @@ export default function TradingViewChart({
     gridCount: _gridCount,
     side = "long",
     orders = [],
+    botPreview,
 }: TradingViewChartProps) {
-    // Ensure numeric types (backend may send decimal strings)
     const lowerPrice = _lowerPrice != null ? Number(_lowerPrice) : undefined;
     const upperPrice = _upperPrice != null ? Number(_upperPrice) : undefined;
     const gridCount = _gridCount != null ? Number(_gridCount) : undefined;
@@ -78,10 +94,12 @@ export default function TradingViewChart({
     const orderLinesRef = useRef<IPriceLine[]>([]);
     const upperAreaRef = useRef<ISeriesApi<"Area"> | null>(null);
     const lowerAreaRef = useRef<ISeriesApi<"Area"> | null>(null);
+    const candleDataRef = useRef<any[]>([]);
 
     const { isDark } = useDarkMode();
     const [interval, setInterval] = useState("1d");
     const [loading, setLoading] = useState(false);
+    const [showPreview, setShowPreview] = useState(true);
 
     const buildChart = useCallback(() => {
         if (!containerRef.current) return;
@@ -170,6 +188,7 @@ export default function TradingViewChart({
         setLoading(true);
         fetchKlines(symbol, interval)
             .then((data) => {
+                candleDataRef.current = data;
                 candleRef.current?.setData(data as any);
                 chartRef.current?.timeScale().fitContent();
             })
@@ -177,7 +196,6 @@ export default function TradingViewChart({
             .finally(() => setLoading(false));
     }, [symbol, interval, isDark]);
 
-    // Draw grid bands and lines
     useEffect(() => {
         const series = candleRef.current;
         const chart = chartRef.current;
@@ -227,7 +245,7 @@ export default function TradingViewChart({
         });
         gridLinesRef.current.push(lowerLine);
 
-        // Internal grid lines with red/green coloring
+        // Internal grid lines
         const count = gridCount || 0;
         if (count > 2) {
             const visibleLines = Math.min(count - 1, 60);
@@ -245,8 +263,8 @@ export default function TradingViewChart({
                 const line = series.createPriceLine({
                     price,
                     color: isSellZone
-                        ? "rgba(239, 68, 68, 0.35)"
-                        : "rgba(34, 197, 94, 0.35)",
+                        ? "rgba(239, 68, 68, 0.25)"
+                        : "rgba(34, 197, 94, 0.25)",
                     lineWidth: 1,
                     lineStyle: 2,
                     axisLabelVisible: false,
@@ -255,19 +273,24 @@ export default function TradingViewChart({
             }
         }
 
-        // Color bands
-        const timeScale = chart.timeScale();
-        const visibleRange = timeScale.getVisibleLogicalRange();
+        // Color bands using actual candle timestamps
+        const candles = candleDataRef.current;
+        if (candles.length > 0) {
+            const firstTime = candles[0].time;
+            const lastTime = candles[candles.length - 1].time;
+            const timeStep = candles.length > 1 ? candles[1].time - candles[0].time : 60;
+            const extendedEnd = lastTime + timeStep * 50;
 
-        if (visibleRange) {
-            const startIdx = Math.floor(visibleRange.from);
-            const endIdx = Math.ceil(visibleRange.to);
+            const bandTimes: number[] = [];
+            for (let t = firstTime; t <= extendedEnd; t += timeStep) {
+                bandTimes.push(t);
+            }
 
             const upperArea = chart.addAreaSeries({
                 topColor:
                     side === "short"
-                        ? "rgba(34, 197, 94, 0.12)"
-                        : "rgba(239, 68, 68, 0.12)",
+                        ? "rgba(34, 197, 94, 0.08)"
+                        : "rgba(239, 68, 68, 0.08)",
                 bottomColor: "rgba(0, 0, 0, 0)",
                 lineColor: "transparent",
                 lineWidth: 1 as any,
@@ -276,12 +299,10 @@ export default function TradingViewChart({
                 crosshairMarkerVisible: false,
             });
 
-            const upperData = [];
-            for (let i = startIdx; i <= endIdx + 50; i++) {
-                upperData.push({ time: i as any, value: upperPrice });
-            }
             try {
-                upperArea.setData(upperData);
+                upperArea.setData(
+                    bandTimes.map((t) => ({ time: t as any, value: upperPrice })),
+                );
             } catch {}
             upperAreaRef.current = upperArea;
 
@@ -289,8 +310,8 @@ export default function TradingViewChart({
                 topColor: "rgba(0, 0, 0, 0)",
                 bottomColor:
                     side === "short"
-                        ? "rgba(239, 68, 68, 0.12)"
-                        : "rgba(34, 197, 94, 0.12)",
+                        ? "rgba(239, 68, 68, 0.08)"
+                        : "rgba(34, 197, 94, 0.08)",
                 lineColor: "transparent",
                 lineWidth: 1 as any,
                 priceLineVisible: false,
@@ -298,18 +319,15 @@ export default function TradingViewChart({
                 crosshairMarkerVisible: false,
             });
 
-            const lowerData = [];
-            for (let i = startIdx; i <= endIdx + 50; i++) {
-                lowerData.push({ time: i as any, value: lowerPrice });
-            }
             try {
-                lowerArea.setData(lowerData);
+                lowerArea.setData(
+                    bandTimes.map((t) => ({ time: t as any, value: lowerPrice })),
+                );
             } catch {}
             lowerAreaRef.current = lowerArea;
         }
     }, [lowerPrice, upperPrice, gridCount, side, isDark, interval]);
 
-    // Draw orders as horizontal price lines at their exact price level
     useEffect(() => {
         const series = candleRef.current;
         if (!series) return;
@@ -325,21 +343,19 @@ export default function TradingViewChart({
         const pendingOrders = orders.filter((o) => o.status === "open");
         const filledOrders = orders.filter((o) => o.status === "filled");
 
-        // Pending: dashed lines with axis label
         pendingOrders.forEach((o) => {
             const isBuy = o.side === "buy";
             const line = series.createPriceLine({
                 price: Number(o.price),
                 color: isBuy ? "rgba(34, 197, 94, 0.8)" : "rgba(239, 68, 68, 0.8)",
                 lineWidth: 1,
-                lineStyle: 2, // dashed
+                lineStyle: 2,
                 axisLabelVisible: true,
                 title: isBuy ? "● C" : "● V",
             });
             orderLinesRef.current.push(line);
         });
 
-        // Filled: solid lines (last 10 max to avoid clutter)
         filledOrders
             .sort((a, b) => b.time - a.time)
             .slice(0, 10)
@@ -349,13 +365,15 @@ export default function TradingViewChart({
                     price: Number(o.price),
                     color: isBuy ? "rgba(34, 197, 94, 0.45)" : "rgba(239, 68, 68, 0.45)",
                     lineWidth: 1,
-                    lineStyle: 0, // solid
+                    lineStyle: 0,
                     axisLabelVisible: false,
                     title: isBuy ? "✓ C" : "✓ V",
                 });
                 orderLinesRef.current.push(line);
             });
     }, [orders, isDark, interval]);
+
+    const hasPreviewData = botPreview && (botPreview.priceLower || botPreview.investment !== "0");
 
     return (
         <div className="h-full flex flex-col">
@@ -389,7 +407,116 @@ export default function TradingViewChart({
                 )}
             </div>
 
-            <div className="flex-1 min-h-0 relative" ref={containerRef} />
+            <div className="flex-1 min-h-0 relative">
+                <div className="absolute inset-0" ref={containerRef} />
+
+                {/* Bot preview floating panel */}
+                {hasPreviewData && showPreview && botPreview && (
+                    <div className="absolute top-2 left-2 z-10 bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg p-2.5 text-[10px] shadow-lg max-w-[200px] select-none">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-semibold text-foreground">
+                                Preview Bot
+                            </span>
+                            <button
+                                onClick={() => setShowPreview(false)}
+                                className="text-muted-foreground hover:text-foreground transition-colors ml-2 leading-none"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="space-y-1 text-muted-foreground">
+                            <div className="flex justify-between">
+                                <span>Par</span>
+                                <span className="text-foreground font-medium">
+                                    {botPreview.symbol.replace("USDT", "/USDT")}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Modo</span>
+                                <span className={cn(
+                                    "font-medium px-1 rounded",
+                                    botPreview.botMode === "futures"
+                                        ? "text-blue-400 bg-blue-500/10"
+                                        : "text-emerald-400 bg-emerald-500/10",
+                                )}>
+                                    {botPreview.botMode === "futures" ? "Futuros" : "Spot"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Dirección</span>
+                                <span className={cn(
+                                    "font-medium",
+                                    botPreview.side === "long"
+                                        ? "text-green-500"
+                                        : botPreview.side === "short"
+                                          ? "text-red-500"
+                                          : "text-foreground",
+                                )}>
+                                    {botPreview.side === "long" ? "Long" : botPreview.side === "short" ? "Short" : "Neutral"}
+                                </span>
+                            </div>
+                            {botPreview.priceLower != null && botPreview.priceUpper != null && (
+                                <div className="flex justify-between">
+                                    <span>Rango</span>
+                                    <span className="text-foreground tabular-nums">
+                                        {botPreview.priceLower.toLocaleString()} - {botPreview.priceUpper.toLocaleString()}
+                                    </span>
+                                </div>
+                            )}
+                            {botPreview.gridCount != null && (
+                                <div className="flex justify-between">
+                                    <span>Rejillas</span>
+                                    <span className="text-foreground tabular-nums">{botPreview.gridCount}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between">
+                                <span>Inversión</span>
+                                <span className="text-foreground tabular-nums">{botPreview.investment} USDT</span>
+                            </div>
+                            {botPreview.botMode === "futures" && Number(botPreview.leverage) > 1 && (
+                                <div className="flex justify-between">
+                                    <span>Leverage</span>
+                                    <span className="text-foreground tabular-nums">{botPreview.leverage}x</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between">
+                                <span>Grid</span>
+                                <span className="text-foreground">
+                                    {botPreview.gridMode === "geometric" ? "Geométrica" : "Aritmética"}
+                                </span>
+                            </div>
+                            {botPreview.stopLoss && (
+                                <div className="flex justify-between">
+                                    <span>SL</span>
+                                    <span className="text-red-400 tabular-nums">{botPreview.stopLoss}</span>
+                                </div>
+                            )}
+                            {botPreview.takeProfit && (
+                                <div className="flex justify-between">
+                                    <span>TP</span>
+                                    <span className="text-green-400 tabular-nums">{botPreview.takeProfit}</span>
+                                </div>
+                            )}
+                            {botPreview.slippage && (
+                                <div className="flex justify-between">
+                                    <span>Slippage</span>
+                                    <span className="text-foreground tabular-nums">{botPreview.slippage}%</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {!showPreview && hasPreviewData && (
+                    <button
+                        onClick={() => setShowPreview(true)}
+                        className="absolute top-2 left-2 z-10 bg-card/80 backdrop-blur-sm border border-border/50 rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors shadow-sm"
+                    >
+                        Preview ▸
+                    </button>
+                )}
+            </div>
         </div>
     );
 }

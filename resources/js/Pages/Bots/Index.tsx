@@ -17,7 +17,7 @@ import BotTable from "./components/BotTable";
 import ConfirmParamsModal from "./components/ConfirmParamsModal";
 import OrderBook from "./components/OrderBook";
 import TickerBar from "./components/TickerBar";
-import TradingViewChart, { ChartOrder } from "./components/TradingViewChart";
+import TradingViewChart, { BotPreview, ChartOrder } from "./components/TradingViewChart";
 
 interface EditBot {
     id: number;
@@ -96,6 +96,21 @@ export default function Index({
     const chartUpper = data.price_upper ? parseFloat(data.price_upper) : undefined;
     const chartGridCount = showGridLines && data.grid_count ? parseInt(data.grid_count) : undefined;
     const chartSide = data.side;
+
+    const botPreview: BotPreview = {
+        symbol: data.symbol,
+        side: data.side,
+        priceLower: chartLower,
+        priceUpper: chartUpper,
+        gridCount: chartGridCount,
+        investment: data.investment,
+        leverage: data.leverage,
+        slippage: data.slippage,
+        stopLoss: data.stop_loss_price || undefined,
+        takeProfit: data.take_profit_price || undefined,
+        gridMode: data.grid_mode,
+        botMode,
+    };
 
     useEffect(() => {
         if (botMode === "spot") setData("leverage", "1");
@@ -204,6 +219,7 @@ export default function Index({
                                                     gridCount={chartGridCount}
                                                     side={chartSide}
                                                     orders={activeBotOrders}
+                                                    botPreview={botPreview}
                                                 />
                                             </ResizablePanel>
 
