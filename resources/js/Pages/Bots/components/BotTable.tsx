@@ -25,6 +25,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { Bot as BotIcon, Eye, Pencil, Play, Square } from "lucide-react";
 import { useState } from "react";
 
