@@ -19,11 +19,17 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { BinanceAccount } from "@/types/bot";
-import { SUPPORTED_PAIRS } from "@/utils/constants";
+import { LEVERAGE_OPTIONS, SUPPORTED_PAIRS } from "@/utils/constants";
 import { Link } from "@inertiajs/react";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface BotFormData {
@@ -39,6 +45,7 @@ interface BotFormData {
     slippage: string;
     stop_loss_price: string;
     take_profit_price: string;
+    grid_mode: string;
 }
 
 interface BotFormAdvancedProps {
@@ -55,6 +62,7 @@ interface BotFormAdvancedProps {
     editBotId?: number;
     showGridLines?: boolean;
     onShowGridLinesChange?: (v: boolean) => void;
+    botMode?: "futures" | "spot";
 }
 
 export default function BotFormAdvanced({
@@ -71,18 +79,19 @@ export default function BotFormAdvanced({
     editBotId,
     showGridLines = true,
     onShowGridLinesChange,
+    botMode = "futures",
 }: BotFormAdvancedProps) {
     const [showLeverageModal, setShowLeverageModal] = useState(false);
     const [tempLeverage, setTempLeverage] = useState<number>(
         parseInt(data.leverage) || 3,
     );
-    const [autoReserve, setAutoReserve] = useState(true);
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     useEffect(() => {
         setData("name", `${data.symbol.replace("USDT", "")} Grid Bot`);
     }, [data.symbol]);
 
+    const isFutures = botMode === "futures";
     const investment = parseFloat(data.investment) || 0;
     const isInvestmentValid =
         balance !== null && investment <= balance && investment > 0;
@@ -93,20 +102,52 @@ export default function BotFormAdvanced({
         !!data.binance_account_id &&
         isInvestmentValid;
 
-    const lev = parseInt(data.leverage) || 1;
-    const realInvestment = investment * 0.76;
-    const marginAdicional = investment * 0.24;
-    const leveragedInvestment = investment * lev * 0.76;
-    const liqPrice = currentPrice ? (currentPrice * 0.52).toFixed(1) : "---";
+    const lev = isFutures ? (parseInt(data.leverage) || 1) : 1;
+    const realInvestment = investment / lev;
+    const marginAdicional = investment - realInvestment;
+    const leveragedInvestment = realInvestment * lev;
+
+    const MAINTENANCE_MARGIN_RATE = 0.004;
+    const liqPrice = currentPrice && lev > 1
+        ? data.side === "short"
+            ? (currentPrice * (1 + 1 / lev - MAINTENANCE_MARGIN_RATE)).toFixed(1)
+            : (currentPrice * (1 - 1 / lev + MAINTENANCE_MARGIN_RATE)).toFixed(1)
+        : "---";
+
     const sliderPct =
         balance && balance > 0
             ? Math.min(Math.round((investment / balance) * 100), 100)
             : 0;
 
+    const priceLower = parseFloat(data.price_lower) || 0;
+    const priceUpper = parseFloat(data.price_upper) || 0;
+
+    const calculateRecommendedGrids = () => {
+        if (priceLower <= 0 || priceUpper <= priceLower) return;
+        const midPrice = (priceUpper + priceLower) / 2;
+        const recommended = Math.round((priceUpper - priceLower) / (midPrice * 0.003));
+        setData("grid_count", String(Math.max(5, Math.min(50, recommended))));
+    };
+
+    const leverageIndex = LEVERAGE_OPTIONS.indexOf(
+        tempLeverage as (typeof LEVERAGE_OPTIONS)[number],
+    );
+    const sliderIdx = leverageIndex >= 0 ? leverageIndex : 0;
+
+    const handleLeveragePrev = () => {
+        const idx = LEVERAGE_OPTIONS.indexOf(tempLeverage as (typeof LEVERAGE_OPTIONS)[number]);
+        if (idx > 0) setTempLeverage(LEVERAGE_OPTIONS[idx - 1]);
+    };
+    const handleLeverageNext = () => {
+        const idx = LEVERAGE_OPTIONS.indexOf(tempLeverage as (typeof LEVERAGE_OPTIONS)[number]);
+        if (idx < LEVERAGE_OPTIONS.length - 1) setTempLeverage(LEVERAGE_OPTIONS[idx + 1]);
+    };
+
+    const gridMode = (data as any).grid_mode || "arithmetic";
+
     return (
         <div className="flex flex-col h-full text-foreground">
             <div className="p-4 space-y-5 overflow-y-auto flex-1 custom-scrollbar">
-                {/* ─── Strategy toggle ─── */}
                 <div className="space-y-3">
                     <div className="space-y-1.5">
                         <Label className="text-[11px] text-muted-foreground">
@@ -122,7 +163,7 @@ export default function BotFormAdvanced({
                             <SelectContent>
                                 {SUPPORTED_PAIRS.map((pair) => (
                                     <SelectItem key={pair} value={pair}>
-                                        {pair.replace("USDT", "/USDT Perp")}
+                                        {pair.replace("USDT", "/USDT")}{isFutures ? " Perp" : ""}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -162,15 +203,6 @@ export default function BotFormAdvanced({
                             Configure una cuenta primero.
                         </p>
                     )}
-
-                    <div className="flex bg-muted/50 p-0.5 rounded-lg">
-                        <button className="flex-1 text-xs py-1.5 text-muted-foreground hover:text-foreground rounded transition-colors">
-                            Copiar estrategia
-                        </button>
-                        <button className="flex-1 text-xs py-1.5 bg-background shadow-sm rounded-md font-medium">
-                            Configuración manual
-                        </button>
-                    </div>
 
                     {/* Side selector */}
                     <div className="space-y-1.5">
@@ -306,7 +338,15 @@ export default function BotFormAdvanced({
                             }
                             className="h-9 text-xs tabular-nums flex-1"
                         />
-                        <button className="text-[10px] bg-muted hover:bg-muted/80 px-2.5 py-2 rounded transition-colors shrink-0 h-9">
+                        <button
+                            type="button"
+                            onClick={calculateRecommendedGrids}
+                            disabled={priceLower <= 0 || priceUpper <= priceLower}
+                            className={cn(
+                                "text-[10px] bg-muted hover:bg-muted/80 px-2.5 py-2 rounded transition-colors shrink-0 h-9",
+                                (priceLower <= 0 || priceUpper <= priceLower) && "opacity-50 cursor-not-allowed",
+                            )}
+                        >
                             Recomendado
                         </button>
                     </div>
@@ -326,7 +366,7 @@ export default function BotFormAdvanced({
                                 onCheckedChange={(c) =>
                                     onShowGridLinesChange?.(c as boolean)
                                 }
-                                className="h-3 w-3 border-orange-500 data-[state=checked]:bg-orange-500 rounded-[2px]"
+                                className="h-3.5 w-3.5 border-orange-500 data-[state=checked]:bg-orange-500 rounded-[3px]"
                             />
                             <label
                                 htmlFor="verRejillas"
@@ -346,22 +386,19 @@ export default function BotFormAdvanced({
                         <Label className="text-xs font-medium">
                             3. Inversión
                         </Label>
-                        <div className="flex items-center space-x-1.5">
-                            <Checkbox
-                                id="reservar"
-                                checked={autoReserve}
-                                onCheckedChange={(c) =>
-                                    setAutoReserve(c as boolean)
-                                }
-                                className="h-3 w-3 rounded-[2px]"
-                            />
-                            <label
-                                htmlFor="reservar"
-                                className="text-[10px] text-muted-foreground"
-                            >
-                                Reservar automáticamente
-                            </label>
-                        </div>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="flex items-center space-x-1 text-[10px] text-muted-foreground">
+                                        <Info className="h-3 w-3" />
+                                        <span>Reserva automática</span>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-[200px] text-xs">
+                                    El margen se reserva automáticamente en Binance al iniciar el bot.
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
 
                     <div className="flex gap-2">
@@ -380,14 +417,16 @@ export default function BotFormAdvanced({
                                 USDT
                             </span>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 px-3 text-xs font-medium"
-                            onClick={() => setShowLeverageModal(true)}
-                        >
-                            {data.leverage}x
-                        </Button>
+                        {isFutures && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-3 text-xs font-medium"
+                                onClick={() => setShowLeverageModal(true)}
+                            >
+                                {data.leverage}x
+                            </Button>
+                        )}
                     </div>
                     {errors.investment && (
                         <p className="text-[10px] text-destructive">
@@ -395,10 +434,12 @@ export default function BotFormAdvanced({
                         </p>
                     )}
 
-                    <p className="text-[10px] text-muted-foreground tabular-nums">
-                        Inversión real ({realInvestment.toFixed(1)}) + Margen
-                        adicional ({marginAdicional.toFixed(1)}) USDT
-                    </p>
+                    {isFutures && (
+                        <p className="text-[10px] text-muted-foreground tabular-nums">
+                            Inversión real ({realInvestment.toFixed(1)}) + Margen
+                            adicional ({marginAdicional.toFixed(1)}) USDT
+                        </p>
+                    )}
 
                     {/* Balance slider */}
                     <div className="px-1">
@@ -478,22 +519,26 @@ export default function BotFormAdvanced({
                                 )}
                             </span>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">
-                                Inv. real (apalancada):
-                            </span>
-                            <span className="tabular-nums">
-                                {leveragedInvestment.toFixed(1)} USDT
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">
-                                Precio est. liquidación:
-                            </span>
-                            <span className="tabular-nums">
-                                {liqPrice} USDT
-                            </span>
-                        </div>
+                        {isFutures && (
+                            <>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">
+                                        Inv. real (apalancada):
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {leveragedInvestment.toFixed(1)} USDT
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground">
+                                        Precio est. liquidación:
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {liqPrice} USDT
+                                    </span>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Advanced settings toggle */}
@@ -560,21 +605,31 @@ export default function BotFormAdvanced({
                                     Modo de rejilla
                                 </span>
                                 <div className="flex bg-muted/50 p-0.5 rounded text-[10px]">
-                                    <span className="px-2 py-0.5 bg-background rounded shadow-sm font-medium">
-                                        Geométrica
-                                    </span>
-                                    <span className="px-2 py-0.5 text-muted-foreground">
+                                    <button
+                                        type="button"
+                                        onClick={() => setData("grid_mode", "arithmetic")}
+                                        className={cn(
+                                            "px-2 py-0.5 rounded transition-colors",
+                                            gridMode === "arithmetic"
+                                                ? "bg-background shadow-sm font-medium"
+                                                : "text-muted-foreground hover:text-foreground",
+                                        )}
+                                    >
                                         Aritmética
-                                    </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setData("grid_mode", "geometric")}
+                                        className={cn(
+                                            "px-2 py-0.5 rounded transition-colors",
+                                            gridMode === "geometric"
+                                                ? "bg-background shadow-sm font-medium"
+                                                : "text-muted-foreground hover:text-foreground",
+                                        )}
+                                    >
+                                        Geométrica
+                                    </button>
                                 </div>
-                            </div>
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">
-                                    Trailing
-                                </span>
-                                <span className="text-muted-foreground">
-                                    Sin establecer
-                                </span>
                             </div>
                         </div>
                     )}
@@ -641,11 +696,8 @@ export default function BotFormAdvanced({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() =>
-                                    setTempLeverage(
-                                        Math.max(1, tempLeverage - 1),
-                                    )
-                                }
+                                onClick={handleLeveragePrev}
+                                disabled={sliderIdx <= 0}
                             >
                                 -
                             </Button>
@@ -659,11 +711,8 @@ export default function BotFormAdvanced({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() =>
-                                    setTempLeverage(
-                                        Math.min(125, tempLeverage + 1),
-                                    )
-                                }
+                                onClick={handleLeverageNext}
+                                disabled={sliderIdx >= LEVERAGE_OPTIONS.length - 1}
                             >
                                 +
                             </Button>
@@ -671,18 +720,27 @@ export default function BotFormAdvanced({
 
                         <div className="space-y-4 px-2">
                             <Slider
-                                value={[tempLeverage]}
-                                onValueChange={(v) => setTempLeverage(v[0])}
-                                max={100}
-                                min={1}
+                                value={[sliderIdx]}
+                                onValueChange={(v) =>
+                                    setTempLeverage(LEVERAGE_OPTIONS[v[0]])
+                                }
+                                max={LEVERAGE_OPTIONS.length - 1}
+                                min={0}
                                 step={1}
                             />
                             <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
-                                <span>1x</span>
-                                <span>25x</span>
-                                <span>50x</span>
-                                <span>75x</span>
-                                <span>100x</span>
+                                {LEVERAGE_OPTIONS.map((lev) => (
+                                    <span
+                                        key={lev}
+                                        className={cn(
+                                            "cursor-pointer hover:text-foreground transition-colors",
+                                            tempLeverage === lev && "text-primary font-medium",
+                                        )}
+                                        onClick={() => setTempLeverage(lev)}
+                                    >
+                                        {lev}x
+                                    </span>
+                                ))}
                             </div>
                         </div>
 

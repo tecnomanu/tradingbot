@@ -20,34 +20,42 @@ interface BotTableProps {
     bots: Bot[];
 }
 
-type TabFilter = "all" | "grid_futures" | "grid_margin" | "signal";
+type TabFilter = "all" | "futures" | "spot" | "active" | "stopped";
 
 const TABS: { key: TabFilter; label: string }[] = [
     { key: "all", label: "Todos" },
-    { key: "grid_futures", label: "Grid Bot de Futuros" },
-    { key: "grid_margin", label: "Grid de Futuros con Margen Cruzado" },
-    { key: "signal", label: "Bot de señales" },
+    { key: "futures", label: "Futuros" },
+    { key: "spot", label: "Spot" },
+    { key: "active", label: "Activos" },
+    { key: "stopped", label: "Detenidos" },
 ];
+
+function filterBots(bots: Bot[], tab: TabFilter): Bot[] {
+    switch (tab) {
+        case "futures":
+            return bots.filter((b) => Number(b.leverage) > 1);
+        case "spot":
+            return bots.filter((b) => Number(b.leverage) <= 1);
+        case "active":
+            return bots.filter((b) => b.status === "active");
+        case "stopped":
+            return bots.filter((b) => b.status === "stopped");
+        default:
+            return bots;
+    }
+}
 
 export default function BotTable({ bots }: BotTableProps) {
     const [activeTab, setActiveTab] = useState<TabFilter>("all");
 
-    const filteredBots =
-        activeTab === "all"
-            ? bots
-            : activeTab === "grid_futures"
-              ? bots.filter(
-                    (b) => b.status === "active" || b.status === "pending",
-                )
-              : [];
+    const filteredBots = filterBots(bots, activeTab);
 
     const counts: Record<TabFilter, number> = {
         all: bots.length,
-        grid_futures: bots.filter(
-            (b) => b.status === "active" || b.status === "pending",
-        ).length,
-        grid_margin: 0,
-        signal: 0,
+        futures: bots.filter((b) => Number(b.leverage) > 1).length,
+        spot: bots.filter((b) => Number(b.leverage) <= 1).length,
+        active: bots.filter((b) => b.status === "active").length,
+        stopped: bots.filter((b) => b.status === "stopped").length,
     };
 
     return (
@@ -105,6 +113,7 @@ function BotRow({ bot }: { bot: Bot }) {
     const investment = parseFloat(bot.investment as any);
     const pnlPct = investment > 0 ? (pnl / investment) * 100 : 0;
     const [stopping, setStopping] = useState(false);
+    const isFutures = Number(bot.leverage) > 1;
 
     const handleStop = () => {
         setStopping(true);
@@ -150,8 +159,18 @@ function BotRow({ bot }: { bot: Bot }) {
                     >
                         {bot.side === "long" ? "Largo" : "Corto"}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
-                        {bot.leverage}x
+                    {isFutures && (
+                        <span className="text-[10px] text-muted-foreground">
+                            {bot.leverage}x
+                        </span>
+                    )}
+                    <span className={cn(
+                        "text-[10px] px-1 py-0.5 rounded",
+                        isFutures
+                            ? "bg-blue-500/15 text-blue-500"
+                            : "bg-emerald-500/15 text-emerald-500",
+                    )}>
+                        {isFutures ? "Futuros" : "Spot"}
                     </span>
                 </div>
             </div>

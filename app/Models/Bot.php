@@ -20,6 +20,7 @@ class Bot extends Model
         'price_lower',
         'price_upper',
         'grid_count',
+        'grid_mode',
         'investment',
         'leverage',
         'slippage',

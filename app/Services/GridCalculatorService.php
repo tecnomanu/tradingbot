@@ -11,13 +11,20 @@ class GridCalculatorService
      *
      * @return array<int, float> Grid prices indexed by level
      */
-    public function calculateGridLevels(float $priceLower, float $priceUpper, int $gridCount): array
+    public function calculateGridLevels(float $priceLower, float $priceUpper, int $gridCount, string $mode = 'arithmetic'): array
     {
         $levels = [];
-        $step = ($priceUpper - $priceLower) / $gridCount;
 
-        for ($i = 0; $i <= $gridCount; $i++) {
-            $levels[$i] = round($priceLower + ($step * $i), 8);
+        if ($mode === 'geometric' && $priceLower > 0) {
+            $ratio = pow($priceUpper / $priceLower, 1 / $gridCount);
+            for ($i = 0; $i <= $gridCount; $i++) {
+                $levels[$i] = round($priceLower * pow($ratio, $i), 8);
+            }
+        } else {
+            $step = ($priceUpper - $priceLower) / $gridCount;
+            for ($i = 0; $i <= $gridCount; $i++) {
+                $levels[$i] = round($priceLower + ($step * $i), 8);
+            }
         }
 
         return $levels;
@@ -88,8 +95,9 @@ class GridCalculatorService
         $investment = (float) $params['investment'];
         $leverage = (int) ($params['leverage'] ?? 1);
         $side = $params['side'] ?? 'long';
+        $gridMode = $params['grid_mode'] ?? 'arithmetic';
 
-        $gridLevels = $this->calculateGridLevels($priceLower, $priceUpper, $gridCount);
+        $gridLevels = $this->calculateGridLevels($priceLower, $priceUpper, $gridCount, $gridMode);
         $profitPerGrid = $this->calculateProfitPerGrid($priceLower, $priceUpper, $gridCount);
         $commissionPerGrid = $this->calculateCommissionPerGrid();
         $investmentBreakdown = $this->calculateInvestmentBreakdown($investment, $leverage);

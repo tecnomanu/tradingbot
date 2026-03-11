@@ -120,8 +120,10 @@ class BotController extends Controller
             'slippage' => 'nullable|numeric|min:0|max:5',
             'stop_loss_price' => 'nullable|numeric|min:0',
             'take_profit_price' => 'nullable|numeric|min:0',
+            'grid_mode' => 'nullable|string|in:arithmetic,geometric',
         ]);
 
+        $validated['grid_mode'] = $validated['grid_mode'] ?? 'arithmetic';
         $validated['user_id'] = $request->user()->id;
 
         $bot = $this->botService->createBot($validated);
@@ -240,8 +242,10 @@ class BotController extends Controller
             'investment' => 'required|numeric|min:' . GridConstants::MIN_INVESTMENT,
             'leverage' => 'required|integer|min:1|max:125',
             'side' => 'required|string|in:long,short,neutral',
+            'grid_mode' => 'nullable|string|in:arithmetic,geometric',
         ]);
 
+        $validated['grid_mode'] = $validated['grid_mode'] ?? 'arithmetic';
         $config = $this->gridCalculator->calculateFullGridConfig($validated);
 
         return $this->successResponse($config);
@@ -341,6 +345,7 @@ class BotController extends Controller
                 'slippage' => (string) $bot->slippage,
                 'stop_loss_price' => $bot->stop_loss_price ? (string) $bot->stop_loss_price : '',
                 'take_profit_price' => $bot->take_profit_price ? (string) $bot->take_profit_price : '',
+                'grid_mode' => $bot->grid_mode ?? 'arithmetic',
                 'status' => $bot->status->value,
             ],
         ]);
@@ -364,8 +369,10 @@ class BotController extends Controller
             'slippage' => 'nullable|numeric|min:0|max:5',
             'stop_loss_price' => 'nullable|numeric|min:0',
             'take_profit_price' => 'nullable|numeric|min:0',
+            'grid_mode' => 'nullable|string|in:arithmetic,geometric',
         ]);
 
+        $validated['grid_mode'] = $validated['grid_mode'] ?? $bot->grid_mode ?? 'arithmetic';
         $wasActive = $bot->status === BotStatus::Active;
 
         if ($wasActive) {
@@ -380,6 +387,7 @@ class BotController extends Controller
             'investment' => $validated['investment'],
             'leverage' => $validated['leverage'],
             'side' => $bot->side->value,
+            'grid_mode' => $validated['grid_mode'],
         ]);
 
         $bot->update(array_merge($validated, [

@@ -33,6 +33,7 @@ interface EditBot {
     slippage: string;
     stop_loss_price: string;
     take_profit_price: string;
+    grid_mode?: string;
     status: string;
 }
 
@@ -67,6 +68,7 @@ export default function Index({
     const [balance, setBalance] = useState<number | null>(null);
     const [fetchingBalance, setFetchingBalance] = useState(false);
     const [showGridLines, setShowGridLines] = useState(true);
+    const [botMode, setBotMode] = useState<"futures" | "spot">("futures");
 
     const { data, setData, post, put, processing, errors } = useForm({
         binance_account_id: editBot?.binance_account_id ??
@@ -84,6 +86,7 @@ export default function Index({
         slippage: editBot?.slippage ?? "0.1",
         stop_loss_price: editBot?.stop_loss_price ?? "",
         take_profit_price: editBot?.take_profit_price ?? "",
+        grid_mode: editBot?.grid_mode ?? "arithmetic",
     });
 
     // Chart always uses form data so the user sees grid changes in real-time.
@@ -93,6 +96,10 @@ export default function Index({
     const chartUpper = data.price_upper ? parseFloat(data.price_upper) : undefined;
     const chartGridCount = showGridLines && data.grid_count ? parseInt(data.grid_count) : undefined;
     const chartSide = data.side;
+
+    useEffect(() => {
+        if (botMode === "spot") setData("leverage", "1");
+    }, [botMode]);
 
     useEffect(() => {
         if (!data.binance_account_id) {
@@ -225,19 +232,33 @@ export default function Index({
                                     >
                                         <div className="h-full flex flex-col bg-card/30 border-l">
                                             <div className="flex border-b text-xs font-medium">
-                                                <div className={`px-4 py-2.5 flex-1 text-center cursor-pointer ${
-                                                    isEditing
-                                                        ? "border-b-2 border-yellow-500 text-yellow-600 dark:text-yellow-400"
-                                                        : "border-b-2 border-primary"
-                                                }`}>
-                                                    {isEditing
-                                                        ? "Editar Bot"
-                                                        : "FuturosBot"}
-                                                </div>
-                                                {!isEditing && (
-                                                    <div className="px-4 py-2.5 text-muted-foreground flex-1 text-center cursor-pointer hover:bg-muted/30 transition-colors">
-                                                        Comercio de futuros
+                                                {isEditing ? (
+                                                    <div className="px-4 py-2.5 flex-1 text-center border-b-2 border-yellow-500 text-yellow-600 dark:text-yellow-400">
+                                                        Editar Bot
                                                     </div>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setBotMode("futures")}
+                                                            className={`px-4 py-2.5 flex-1 text-center transition-colors ${
+                                                                botMode === "futures"
+                                                                    ? "border-b-2 border-primary text-foreground"
+                                                                    : "text-muted-foreground hover:bg-muted/30"
+                                                            }`}
+                                                        >
+                                                            Futuros
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setBotMode("spot")}
+                                                            className={`px-4 py-2.5 flex-1 text-center transition-colors ${
+                                                                botMode === "spot"
+                                                                    ? "border-b-2 border-primary text-foreground"
+                                                                    : "text-muted-foreground hover:bg-muted/30"
+                                                            }`}
+                                                        >
+                                                            Spot
+                                                        </button>
+                                                    </>
                                                 )}
                                             </div>
                                             <div className="flex-1 overflow-hidden">
@@ -255,6 +276,7 @@ export default function Index({
                                                     editBotId={editBot?.id}
                                                     showGridLines={showGridLines}
                                                     onShowGridLinesChange={setShowGridLines}
+                                                    botMode={botMode}
                                                 />
                                             </div>
                                         </div>
