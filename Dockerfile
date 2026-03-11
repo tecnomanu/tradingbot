@@ -35,6 +35,9 @@ RUN npm ci --legacy-peer-deps
 # ── Stage 3: Build ────────────────────────────────────────────────────
 FROM dependencies AS build
 
+ARG APP_NAME="GridBot Trading"
+ENV VITE_APP_NAME=${APP_NAME}
+
 COPY . .
 
 RUN composer dump-autoload --optimize --no-dev

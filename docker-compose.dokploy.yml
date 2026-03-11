@@ -4,13 +4,15 @@ services:
       context: .
       dockerfile: Dockerfile
       target: web
+      args:
+        APP_NAME: ${APP_NAME:-GridBot Trading}
     volumes:
       - app-storage:/var/www/html/storage
     ports:
       - "${EXTERNAL_PORT:-8100}:8000"
     environment:
       - CONTAINER_ROLE=app
-      - APP_NAME=TradingBot
+      - APP_NAME=${APP_NAME-TradingBot}
       - APP_ENV=${APP_ENV-production}
       - APP_KEY=${APP_KEY}
       - APP_DEBUG=${APP_DEBUG-false}
@@ -56,6 +58,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: horizon
+      args:
+        APP_NAME: ${APP_NAME:-GridBot Trading}
     volumes:
       - app-storage:/var/www/html/storage
     environment:
@@ -107,7 +111,17 @@ services:
     networks:
       - tradingbot-net
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_PASSWORD}",
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
