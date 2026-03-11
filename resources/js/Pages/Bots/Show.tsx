@@ -1070,11 +1070,22 @@ function detectPreset(prompt: string | null): string {
     return "custom";
 }
 
+const INTERVAL_OPTIONS = [
+    { value: 5, label: "5 min" },
+    { value: 10, label: "10 min" },
+    { value: 15, label: "15 min" },
+    { value: 30, label: "30 min" },
+    { value: 60, label: "1 hora" },
+];
+
 function AiPromptConfig({ bot }: { bot: Bot }) {
     const detectedPreset = detectPreset(bot.ai_system_prompt);
     const [activePreset, setActivePreset] = useState(detectedPreset);
     const [customPrompt, setCustomPrompt] = useState(bot.ai_system_prompt ?? "");
     const [userPrompt, setUserPrompt] = useState(bot.ai_user_prompt ?? "");
+    const [interval, setInterval] = useState(bot.ai_consultation_interval || 15);
+    const [notifyTelegram, setNotifyTelegram] = useState(bot.ai_notify_telegram ?? false);
+    const [notifyEvents, setNotifyEvents] = useState<string[]>(bot.ai_notify_events ?? ["grid_adjusted", "bot_stopped", "stop_loss_set", "position_closed"]);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [review, setReview] = useState<string | null>(null);
@@ -1101,7 +1112,13 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
         setSaved(false);
         router.put(
             `/ai-agent/bots/${bot.id}/prompts`,
-            { ai_system_prompt: currentPrompt, ai_user_prompt: userPrompt || null },
+            {
+                ai_system_prompt: currentPrompt,
+                ai_user_prompt: userPrompt || null,
+                ai_consultation_interval: interval,
+                ai_notify_telegram: notifyTelegram,
+                ai_notify_events: notifyEvents,
+            },
             {
                 preserveScroll: true,
                 onSuccess: () => setSaved(true),
@@ -1203,6 +1220,85 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                             <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">{currentPrompt}</pre>
                         </div>
                     )}
+
+                    <div className="space-y-2">
+                        <Label>Intervalo de consulta</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {INTERVAL_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => { setInterval(opt.value); setSaved(false); }}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
+                                        interval === opt.value
+                                            ? "border-primary bg-primary/10 text-primary"
+                                            : "border-border hover:border-primary/50 text-muted-foreground"
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Cada cuánto el agente AI revisa este bot automáticamente.
+                        </p>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <Label>Notificaciones Telegram</Label>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Recibí alertas cuando el agente ejecute acciones.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={notifyTelegram}
+                                onClick={() => { setNotifyTelegram(!notifyTelegram); setSaved(false); }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                    notifyTelegram ? "bg-primary" : "bg-muted"
+                                }`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    notifyTelegram ? "translate-x-6" : "translate-x-1"
+                                }`} />
+                            </button>
+                        </div>
+                        {notifyTelegram && (
+                            <div className="space-y-2 pl-0.5">
+                                <p className="text-xs font-medium text-muted-foreground">Notificar cuando:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { key: "grid_adjusted", label: "Grid ajustado" },
+                                        { key: "bot_stopped", label: "Bot detenido" },
+                                        { key: "stop_loss_set", label: "Stop Loss" },
+                                        { key: "take_profit_set", label: "Take Profit" },
+                                        { key: "position_closed", label: "Posición cerrada" },
+                                        { key: "orders_cancelled", label: "Órdenes canceladas" },
+                                    ].map((evt) => (
+                                        <label key={evt.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={notifyEvents.includes(evt.key)}
+                                                onChange={(e) => {
+                                                    setNotifyEvents(
+                                                        e.target.checked
+                                                            ? [...notifyEvents, evt.key]
+                                                            : notifyEvents.filter((k) => k !== evt.key)
+                                                    );
+                                                    setSaved(false);
+                                                }}
+                                                className="rounded border-border"
+                                            />
+                                            {evt.label}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="user-prompt">Mensaje Inicial</Label>

@@ -2,17 +2,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { PageProps } from "@/types";
 import { Head } from "@inertiajs/react";
-import { KeyRound, Terminal, Trash2, User } from "lucide-react";
+import { KeyRound, MessageCircle, Terminal, Trash2, User } from "lucide-react";
 import DeleteUserForm from "./Partials/DeleteUserForm";
 import UpdatePasswordForm from "./Partials/UpdatePasswordForm";
 import UpdateProfileInformationForm from "./Partials/UpdateProfileInformationForm";
 import ApiKeyManager from "./Partials/ApiKeyManager";
+import TelegramConfig from "./Partials/TelegramConfig";
 
 export default function Edit({
     mustVerifyEmail,
     status,
     apiKey,
-}: PageProps<{ mustVerifyEmail: boolean; status?: string; apiKey: string }>) {
+    telegramChatId,
+    telegramConnected,
+}: PageProps<{
+    mustVerifyEmail: boolean;
+    status?: string;
+    apiKey: string;
+    telegramChatId: string | null;
+    telegramConnected: boolean;
+}>) {
     return (
         <AuthenticatedLayout
             header={
@@ -26,7 +35,7 @@ export default function Edit({
             <div className="py-8 text-foreground">
                 <div className="mx-auto max-w-2xl px-4 sm:px-6">
                     <Tabs defaultValue="profile" className="space-y-6">
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-5">
                             <TabsTrigger
                                 value="profile"
                                 className="flex items-center gap-2"
@@ -42,6 +51,13 @@ export default function Edit({
                                 <span className="hidden sm:inline">
                                     Contraseña
                                 </span>
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="telegram"
+                                className="flex items-center gap-2"
+                            >
+                                <MessageCircle className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Telegram</span>
                             </TabsTrigger>
                             <TabsTrigger
                                 value="apikey"
@@ -88,6 +104,22 @@ export default function Edit({
                                 </p>
                             </div>
                             <UpdatePasswordForm />
+                        </TabsContent>
+
+                        <TabsContent value="telegram" className="space-y-4">
+                            <div>
+                                <h3 className="text-lg font-semibold">
+                                    Notificaciones Telegram
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Conectá Telegram para recibir alertas cuando
+                                    el agente AI ejecute acciones en tus bots.
+                                </p>
+                            </div>
+                            <TelegramConfig
+                                chatId={telegramChatId}
+                                connected={telegramConnected}
+                            />
                         </TabsContent>
 
                         <TabsContent value="apikey" className="space-y-4">

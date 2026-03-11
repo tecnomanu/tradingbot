@@ -123,14 +123,21 @@ class AiAgentController extends Controller
         $data = $request->validate([
             'ai_system_prompt' => 'nullable|string|max:5000',
             'ai_user_prompt' => 'nullable|string|max:2000',
+            'ai_consultation_interval' => 'nullable|integer|in:5,10,15,30,60',
+            'ai_notify_telegram' => 'nullable|boolean',
+            'ai_notify_events' => 'nullable|array',
+            'ai_notify_events.*' => 'string|in:grid_adjusted,bot_stopped,stop_loss_set,take_profit_set,position_closed,orders_cancelled',
         ]);
 
         $bot->update([
             'ai_system_prompt' => $data['ai_system_prompt'] ?: null,
             'ai_user_prompt' => $data['ai_user_prompt'] ?: null,
+            'ai_consultation_interval' => $data['ai_consultation_interval'] ?? 15,
+            'ai_notify_telegram' => $data['ai_notify_telegram'] ?? false,
+            'ai_notify_events' => $data['ai_notify_events'] ?? null,
         ]);
 
-        return back()->with('success', 'Prompts AI actualizados.');
+        return back()->with('success', 'Configuración AI actualizada.');
     }
 
     public function testBotPrompts(Request $request, Bot $bot): JsonResponse

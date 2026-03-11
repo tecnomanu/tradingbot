@@ -6,6 +6,7 @@ use App\Http\Controllers\BotController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -51,6 +52,15 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/profile/rotate-api-key', [ProfileController::class, 'rotateApiKey'])->name('profile.rotate-api-key');
+
+    // Telegram
+    Route::post('/telegram/link-token', [TelegramController::class, 'generateLinkToken'])->name('telegram.link-token');
+    Route::post('/telegram/disconnect', [TelegramController::class, 'disconnect'])->name('telegram.disconnect');
+    Route::post('/telegram/test', [TelegramController::class, 'testMessage'])->name('telegram.test');
+    Route::post('/telegram/setup-webhook', [TelegramController::class, 'setupWebhook'])->name('telegram.setup-webhook');
 });
+
+// Telegram webhook (public, no auth)
+Route::post('/api/telegram/webhook', [TelegramController::class, 'webhook'])->name('telegram.webhook');
 
 require __DIR__ . '/auth.php';

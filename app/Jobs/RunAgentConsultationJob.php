@@ -21,7 +21,7 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 
     public int $tries = 1;
     public int $timeout = 300;
-    public int $uniqueFor = 900;
+    public int $uniqueFor = 240;
 
     public function uniqueId(): string
     {
@@ -35,7 +35,7 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
         foreach ($bots as $bot) {
             try {
                 if (!$this->shouldConsult($bot)) {
-                    Log::debug('RunAgentConsultationJob: skipped (no changes)', ['bot_id' => $bot->id]);
+                    Log::debug('RunAgentConsultationJob: skipped (interval not reached)', ['bot_id' => $bot->id]);
                     continue;
                 }
 
@@ -60,27 +60,24 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 
     private function shouldConsult(Bot $bot): bool
     {
-        // Always consult if no successful consultation in the last hour
+        $intervalMinutes = $bot->ai_consultation_interval ?: 15;
+
         $lastSuccess = AiConversation::where('bot_id', $bot->id)
             ->where('status', 'completed')
             ->where('total_tokens', '>', 0)
             ->latest()
             ->first();
 
-        if (!$lastSuccess || $lastSuccess->ended_at->lt(now()->subHour())) {
+        if (!$lastSuccess || $lastSuccess->ended_at->lt(now()->subMinutes($intervalMinutes))) {
             return true;
         }
 
-        // Consult if recent analyses show non-neutral signal or actionable suggestion
+        // Override: consult sooner if recent analyses show non-neutral signal
         $recentLogs = AiAgentLog::where('bot_id', $bot->id)
-            ->where('created_at', '>=', now()->subMinutes(20))
+            ->where('created_at', '>=', now()->subMinutes(min($intervalMinutes, 20)))
             ->latest()
             ->limit(3)
             ->get();
-
-        if ($recentLogs->isEmpty()) {
-            return true;
-        }
 
         foreach ($recentLogs as $log) {
             if ($log->signal !== 'neutral') {

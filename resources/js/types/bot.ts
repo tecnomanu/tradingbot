@@ -37,6 +37,9 @@ export interface Bot {
     take_profit_price: number | null;
     ai_system_prompt: string | null;
     ai_user_prompt: string | null;
+    ai_consultation_interval: number;
+    ai_notify_telegram: boolean;
+    ai_notify_events: string[] | null;
     started_at: string | null;
     stopped_at: string | null;
     created_at: string;

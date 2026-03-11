@@ -18,12 +18,15 @@ class User extends Authenticatable
         'email',
         'password',
         'api_key',
+        'telegram_chat_id',
+        'telegram_link_token',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
         'api_key',
+        'telegram_link_token',
     ];
 
     protected function casts(): array

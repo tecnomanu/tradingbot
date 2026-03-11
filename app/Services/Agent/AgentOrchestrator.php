@@ -67,6 +67,8 @@ class AgentOrchestrator
                 'tool_calls' => $this->totalToolCalls,
                 'duration_ms' => $durationMs,
             ]);
+
+            $this->sendTelegramNotification($bot, $conversation);
         } catch (\Exception $e) {
             Log::error('AgentOrchestrator: consultation failed', [
                 'conversation_id' => $conversation->id,
@@ -525,6 +527,47 @@ P,
                 'conversation_id' => $conversation->id,
                 'role' => $msg['role'],
                 'content' => $msg['content'] ?? null,
+            ]);
+        }
+    }
+
+    private function sendTelegramNotification(Bot $bot, AiConversation $conversation): void
+    {
+        if (!$bot->ai_notify_telegram) {
+            return;
+        }
+
+        $actions = $conversation->actions_taken ?? [];
+        if (empty($actions)) {
+            return;
+        }
+
+        $allowedEvents = $bot->ai_notify_events ?? ['grid_adjusted', 'bot_stopped', 'stop_loss_set', 'position_closed'];
+        $matchingActions = array_intersect($actions, $allowedEvents);
+
+        if (empty($matchingActions)) {
+            return;
+        }
+
+        $user = $bot->user;
+        if (!$user || empty($user->telegram_chat_id)) {
+            return;
+        }
+
+        try {
+            $telegram = app(\App\Services\TelegramService::class);
+            $message = $telegram->formatAgentNotification(
+                $bot->name,
+                $bot->symbol,
+                $actions,
+                $conversation->summary,
+                $conversation->analysis,
+            );
+            $telegram->sendMessage($user->telegram_chat_id, $message);
+        } catch (\Exception $e) {
+            Log::warning('AgentOrchestrator: telegram notification failed', [
+                'bot_id' => $bot->id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

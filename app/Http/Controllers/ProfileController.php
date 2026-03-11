@@ -19,9 +19,11 @@ class ProfileController extends Controller
     public function edit(Request $request): Response
     {
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status'          => session('status'),
-            'apiKey'          => $request->user()->api_key,
+            'mustVerifyEmail'   => $request->user() instanceof MustVerifyEmail,
+            'status'            => session('status'),
+            'apiKey'            => $request->user()->api_key,
+            'telegramChatId'    => $request->user()->telegram_chat_id,
+            'telegramConnected' => !empty($request->user()->telegram_chat_id),
         ]);
     }
 

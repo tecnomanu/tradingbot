@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'api/telegram/webhook',
+        ]);
+
         $middleware->alias([
             'api.key' => \App\Http\Middleware\ApiKeyMiddleware::class,
         ]);
