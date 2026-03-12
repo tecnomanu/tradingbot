@@ -1,0 +1,46 @@
+---
+description: Deploy workflow - commit, push, and trigger Dokploy compose deploy
+alwaysApply: true
+---
+
+# Deploy Workflow
+
+When asked to deploy, commit, or push to production, follow this sequence:
+
+## 1. Build check
+
+```bash
+npm run build
+```
+
+If it fails, fix errors before continuing.
+
+## 2. Commit
+
+```bash
+git add <changed-files>
+git commit -m "<concise message>"
+```
+
+## 3. Push
+
+```bash
+git push origin main
+```
+
+## 4. Trigger Dokploy deploy
+
+```bash
+curl -s -X POST "http://wizardgpt.tail100e88.ts.net:3000/api/deploy/compose/LsajeN9Wk6UlNWtctcJ40" \
+  -H "X-GitHub-Event: push" \
+  -H "Content-Type: application/json" \
+  -d '{"ref": "refs/heads/main"}'
+```
+
+Expected response: `{"message":"Compose deployed successfully"}`
+
+## Notes
+
+- The server is on Tailscale (`wizardgpt.tail100e88.ts.net:3000`), only reachable from within the Tailscale network.
+- The `X-GitHub-Event: push` header is required — without it Dokploy returns "Branch Not Match".
+- Branch must be `main`.
