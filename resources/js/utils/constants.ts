@@ -23,7 +23,7 @@ export const LEVERAGE_OPTIONS = [
 export const NAV_ITEMS = [
     { label: "Dashboard", href: "/dashboard", routeName: "dashboard" },
     { label: "Trading", href: "/bots", routeName: "bots.*" },
-    { label: "Ordenes", href: "/orders/bots", routeName: "orders.*" },
+    { label: "Actividad", href: "/orders/positions", routeName: "orders.*" },
     { label: "AI Agent", href: "/ai-agent", routeName: "ai-agent.*" },
     {
         label: "Cuentas",
@@ -34,9 +34,9 @@ export const NAV_ITEMS = [
 
 export const ORDER_NAV_ITEMS = [
     {
-        label: "Bots",
-        href: "/orders/bots",
-        routeName: "orders.bots",
+        label: "Posiciones",
+        href: "/orders/positions",
+        routeName: "orders.positions",
     },
     {
         label: "Órdenes",
@@ -44,8 +44,8 @@ export const ORDER_NAV_ITEMS = [
         routeName: "orders.history",
     },
     {
-        label: "Posiciones",
-        href: "/orders/positions",
-        routeName: "orders.positions",
+        label: "Grid Bots",
+        href: "/orders/bots",
+        routeName: "orders.bots",
     },
 ] as const;

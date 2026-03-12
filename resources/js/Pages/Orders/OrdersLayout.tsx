@@ -5,7 +5,7 @@ import { Bot, History, BarChart3 } from "lucide-react";
 import { PropsWithChildren } from "react";
 
 const ICONS: Record<string, React.ElementType> = {
-    Bots: Bot,
+    "Grid Bots": Bot,
     "Órdenes": History,
     Posiciones: BarChart3,
 };
