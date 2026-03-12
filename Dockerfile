@@ -68,6 +68,3 @@ CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
 
 FROM production AS horizon
 CMD ["php", "artisan", "horizon"]
-
-FROM production AS scheduler
-CMD ["php", "artisan", "schedule:work"]
