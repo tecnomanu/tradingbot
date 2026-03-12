@@ -355,7 +355,7 @@ export default function OrderHistory({
                                     disabled={orders.current_page <= 1}
                                     onClick={() =>
                                         navigate({
-                                            ...filters,
+                                            page: String(orders.current_page - 1),
                                         } as any)
                                     }
                                 >
@@ -371,7 +371,7 @@ export default function OrderHistory({
                                     }
                                     onClick={() =>
                                         navigate({
-                                            ...filters,
+                                            page: String(orders.current_page + 1),
                                         } as any)
                                     }
                                 >

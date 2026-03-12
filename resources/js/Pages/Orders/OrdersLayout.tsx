@@ -1,7 +1,14 @@
 import { cn } from "@/lib/utils";
 import { ORDER_NAV_ITEMS } from "@/utils/constants";
 import { Link } from "@inertiajs/react";
+import { Bot, History, BarChart3 } from "lucide-react";
 import { PropsWithChildren } from "react";
+
+const ICONS: Record<string, React.ElementType> = {
+    Bots: Bot,
+    "Órdenes": History,
+    Posiciones: BarChart3,
+};
 
 export function OrdersLayout({ children }: PropsWithChildren) {
     const isActive = (pattern: string) => {
@@ -14,36 +21,28 @@ export function OrdersLayout({ children }: PropsWithChildren) {
 
     return (
         <div className="flex min-h-[calc(100vh-3.5rem)] text-foreground">
-            {/* Sidebar */}
-            <aside className="hidden w-56 shrink-0 border-r bg-card/40 lg:block">
-                <nav className="p-4 space-y-5">
-                    {ORDER_NAV_ITEMS.map((group) => (
-                        <div key={group.group}>
-                            <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                {group.group}
-                            </p>
-                            <div className="space-y-0.5">
-                                {group.items.map((item) => (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        className={cn(
-                                            "flex items-center rounded-md px-2 py-1.5 text-sm transition-colors",
-                                            isActive(item.routeName)
-                                                ? "bg-primary/10 text-primary font-medium"
-                                                : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                                        )}
-                                    >
-                                        {item.label}
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
+            <aside className="hidden w-48 shrink-0 border-r bg-card/40 lg:block">
+                <nav className="p-3 space-y-0.5">
+                    {ORDER_NAV_ITEMS.map((item) => {
+                        const Icon = ICONS[item.label];
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={cn(
+                                    "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                                    isActive(item.routeName)
+                                        ? "bg-primary/10 text-primary font-medium"
+                                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                                )}
+                            >
+                                {Icon && <Icon className="h-4 w-4" />}
+                                {item.label}
+                            </Link>
+                        );
+                    })}
                 </nav>
             </aside>
-
-            {/* Main content */}
             <div className="flex-1 overflow-auto">{children}</div>
         </div>
     );

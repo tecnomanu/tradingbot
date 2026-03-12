@@ -10,54 +10,28 @@ use Inertia\Response;
 
 class OrderController extends Controller
 {
-    public function activeBots(Request $request): Response
+    public function bots(Request $request): Response
     {
-        $bots = Bot::where('user_id', $request->user()->id)
-            ->whereIn('status', ['active', 'pending'])
+        $userId = $request->user()->id;
+
+        $withCounts = fn ($query) => $query
             ->with('binanceAccount:id,label,is_testnet')
             ->withCount([
                 'orders as open_orders_count' => fn ($q) => $q->where('status', 'open'),
                 'orders as filled_orders_count' => fn ($q) => $q->where('status', 'filled'),
-            ])
-            ->orderByDesc('started_at')
-            ->get()
-            ->map(function ($bot) {
-                $bot->filled_24h = $bot->orders()
-                    ->where('status', 'filled')
-                    ->where('filled_at', '>=', now()->subDay())
-                    ->count();
-                $bot->rounds_24h = (int) floor($bot->filled_24h / 2);
-                return $bot;
-            });
+            ]);
 
-        return Inertia::render('Orders/ActiveBots', [
-            'bots' => $bots,
-        ]);
-    }
+        $activeBots = $withCounts(
+            Bot::where('user_id', $userId)->whereIn('status', ['active', 'pending'])
+        )->orderByDesc('started_at')->get();
 
-    public function botHistory(Request $request): Response
-    {
-        $bots = Bot::where('user_id', $request->user()->id)
-            ->whereIn('status', ['stopped', 'error', 'completed'])
-            ->with('binanceAccount:id,label,is_testnet')
-            ->orderByDesc('updated_at')
-            ->get();
+        $stoppedBots = $withCounts(
+            Bot::where('user_id', $userId)->whereIn('status', ['stopped', 'error', 'completed'])
+        )->orderByDesc('updated_at')->get();
 
-        return Inertia::render('Orders/BotHistory', [
-            'bots' => $bots,
-        ]);
-    }
-
-    public function openOrders(Request $request): Response
-    {
-        $orders = Order::whereHas('bot', fn ($q) => $q->where('user_id', $request->user()->id))
-            ->where('status', 'open')
-            ->with('bot:id,name,symbol,side')
-            ->orderByDesc('created_at')
-            ->paginate(50);
-
-        return Inertia::render('Orders/OpenOrders', [
-            'orders' => $orders,
+        return Inertia::render('Orders/Bots', [
+            'activeBots' => $activeBots,
+            'stoppedBots' => $stoppedBots,
         ]);
     }
 

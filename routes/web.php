@@ -24,9 +24,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Orders & Activity
     Route::prefix('orders')->name('orders.')->group(function () {
-        Route::get('/active-bots', [OrderController::class, 'activeBots'])->name('active-bots');
-        Route::get('/bot-history', [OrderController::class, 'botHistory'])->name('bot-history');
-        Route::get('/open', [OrderController::class, 'openOrders'])->name('open');
+        Route::get('/bots', [OrderController::class, 'bots'])->name('bots');
         Route::get('/history', [OrderController::class, 'orderHistory'])->name('history');
         Route::get('/positions', [OrderController::class, 'positions'])->name('positions');
     });

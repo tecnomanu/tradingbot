@@ -190,7 +190,7 @@ export default function Index({
                         sub={`abiertas · ${extended.filled_24h} exec 24h · ${extended.rounds_24h} rondas`}
                         icon={ShoppingCart}
                         color="text-orange-500"
-                        href="/orders/active-bots"
+                        href="/orders/bots"
                     />
                     <MiniStat
                         label="AI Agent"
