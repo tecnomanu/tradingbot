@@ -239,14 +239,11 @@ export default function Index({
                     />
                 </div>
 
-                {/* Row 2: Chart + Bots + Activity */}
+                {/* Row 2: PNL Chart + Recent Executions */}
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-                    {/* PNL Chart — collapses gracefully when empty */}
-                    <Card className="lg:col-span-5">
+                    <Card className="lg:col-span-8">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">
-                                Evolución PNL
-                            </CardTitle>
+                            <CardTitle className="text-sm">Evolución PNL</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {pnlChart.length === 0 ? (
@@ -260,12 +257,9 @@ export default function Index({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-52">
+                                <div className="h-56">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart
-                                            data={pnlChart}
-                                            margin={{ top: 5, right: 5, left: -15, bottom: 0 }}
-                                        >
+                                        <AreaChart data={pnlChart} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="dashPnl" x1="0" y1="0" x2="0" y2="1">
                                                     <stop offset="5%" stopColor="#22a962" stopOpacity={0.3} />
@@ -319,12 +313,47 @@ export default function Index({
                         </CardContent>
                     </Card>
 
-                    {/* Active Bots */}
+                    {/* Recent Executions */}
                     <Card className="lg:col-span-4">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm">
-                                Bots Activos ({activeBots.length})
-                            </CardTitle>
+                            <CardTitle className="text-sm">Últimas Ejecuciones</CardTitle>
+                            <Link href="/orders/history" className="text-[10px] text-muted-foreground hover:text-foreground">
+                                Ver todas<ArrowUpRight className="inline h-3 w-3 ml-0.5" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent>
+                            {recentOrders.length === 0 ? (
+                                <p className="text-xs text-muted-foreground py-2 text-center">Sin ejecuciones recientes</p>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    {recentOrders.map((order) => (
+                                        <div key={order.id} className="flex items-center justify-between text-[11px] py-1 border-b border-dashed last:border-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <Badge variant={order.side === "buy" ? "default" : "destructive"} className="text-[8px] h-4 px-1">
+                                                    {order.side === "buy" ? "C" : "V"}
+                                                </Badge>
+                                                <span className="font-mono tabular-nums">{formatCurrency(order.price)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-medium tabular-nums ${order.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                                    {order.pnl > 0 ? "+" : ""}{formatCurrency(order.pnl)}
+                                                </span>
+                                                <span className="text-muted-foreground">{timeSince(order.filled_at)}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Row 3: Bots + AI Agent + Accounts */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                    {/* Active Bots */}
+                    <Card className="lg:col-span-5">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm">Bots Activos ({activeBots.length})</CardTitle>
                             <Button variant="ghost" size="sm" className="h-6 text-[10px]" asChild>
                                 <Link href="/bots">Ver todos</Link>
                             </Button>
@@ -336,22 +365,18 @@ export default function Index({
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-medium">Sin bots activos</p>
                                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                                            Los bots detenidos aparecerán en{" "}
+                                            Los bots detenidos aparecen en{" "}
                                             <Link href="/orders/bots" className="text-primary hover:underline">Actividad</Link>
                                         </p>
                                     </div>
                                     <Button asChild size="sm" className="h-7 text-xs shrink-0">
-                                        <Link href="/bots">Crear bot</Link>
+                                        <Link href="/bots/create">Crear bot</Link>
                                     </Button>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
                                     {activeBots.map((bot) => (
-                                        <Link
-                                            key={bot.id}
-                                            href={`/bots/${bot.id}`}
-                                            className="flex items-center justify-between rounded-md border p-2.5 hover:bg-muted/30 transition-colors"
-                                        >
+                                        <Link key={bot.id} href={`/bots/${bot.id}`} className="flex items-center justify-between rounded-md border p-2.5 hover:bg-muted/30 transition-colors">
                                             <div className="flex items-center gap-2.5">
                                                 <div className="relative">
                                                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-[10px] font-bold text-primary">
@@ -365,22 +390,16 @@ export default function Index({
                                                 <div>
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-xs font-medium">{bot.name}</span>
-                                                        <Badge variant="outline" className="text-[8px] h-4 px-1">
-                                                            {bot.leverage}x
-                                                        </Badge>
+                                                        <Badge variant="outline" className="text-[8px] h-4 px-1">{bot.leverage}x</Badge>
                                                     </div>
-                                                    <p className="text-[10px] text-muted-foreground">
-                                                        {bot.grid_count} rejillas · {bot.total_rounds} rondas
-                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">{bot.grid_count} rejillas · {bot.total_rounds} rondas</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
                                                 <p className={`text-xs font-bold tabular-nums ${bot.total_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                                                     {bot.total_pnl >= 0 ? "+" : ""}{formatCurrency(bot.total_pnl)} USDT
                                                 </p>
-                                                <p className="text-[10px] text-muted-foreground">
-                                                    {formatCurrency(bot.real_investment)} inv.
-                                                </p>
+                                                <p className="text-[10px] text-muted-foreground">{formatCurrency(bot.real_investment)} inv.</p>
                                             </div>
                                         </Link>
                                     ))}
@@ -389,157 +408,58 @@ export default function Index({
                         </CardContent>
                     </Card>
 
-                    {/* Recent Activity */}
-                    <div className="lg:col-span-3 space-y-4">
-                        {/* Recent Filled Orders */}
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm">
-                                    Últimas Ejecuciones
-                                </CardTitle>
-                                <Link
-                                    href="/orders/history"
-                                    className="text-[10px] text-muted-foreground hover:text-foreground"
-                                >
-                                    Ver todas
-                                    <ArrowUpRight className="inline h-3 w-3 ml-0.5" />
-                                </Link>
-                            </CardHeader>
-                            <CardContent>
-                                {recentOrders.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground py-2 text-center">
-                                        Sin ejecuciones recientes
-                                    </p>
-                                ) : (
-                                    <div className="space-y-1.5">
-                                        {recentOrders.map((order) => (
-                                            <div
-                                                key={order.id}
-                                                className="flex items-center justify-between text-[11px] py-1 border-b border-dashed last:border-0"
-                                            >
-                                                <div className="flex items-center gap-1.5">
-                                                    <Badge
-                                                        variant={
-                                                            order.side ===
-                                                            "buy"
-                                                                ? "default"
-                                                                : "destructive"
-                                                        }
-                                                        className="text-[8px] h-4 px-1"
-                                                    >
-                                                        {order.side === "buy"
-                                                            ? "C"
-                                                            : "V"}
-                                                    </Badge>
-                                                    <span className="font-mono tabular-nums">
-                                                        {formatCurrency(
-                                                            order.price,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span
-                                                        className={`font-medium tabular-nums ${
-                                                            order.pnl >= 0
-                                                                ? "text-green-500"
-                                                                : "text-red-500"
-                                                        }`}
-                                                    >
-                                                        {order.pnl > 0
-                                                            ? "+"
-                                                            : ""}
-                                                        {formatCurrency(
-                                                            order.pnl,
-                                                        )}
-                                                    </span>
-                                                    <span className="text-muted-foreground">
-                                                        {timeSince(
-                                                            order.filled_at,
-                                                        )}
-                                                    </span>
-                                                </div>
+                    {/* AI Agent Activity */}
+                    <Card className="lg:col-span-4">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm">AI Agent</CardTitle>
+                            <Link href="/ai-agent" className="text-[10px] text-muted-foreground hover:text-foreground">
+                                Panel AI<ArrowUpRight className="inline h-3 w-3 ml-0.5" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent>
+                            {recentActions.length === 0 ? (
+                                <p className="text-xs text-muted-foreground py-2 text-center">Sin acciones del agente</p>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    {recentActions.map((action) => (
+                                        <div key={action.id} className="flex items-center justify-between text-[11px] py-1 border-b border-dashed last:border-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <Zap className="h-3 w-3 text-purple-500" />
+                                                <span className="font-medium">{action.action}</span>
+                                                <Badge variant="outline" className="text-[8px] h-4 px-1">{action.source}</Badge>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* AI Agent Activity */}
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm">
-                                    AI Agent
-                                </CardTitle>
-                                <Link
-                                    href="/ai-agent"
-                                    className="text-[10px] text-muted-foreground hover:text-foreground"
-                                >
-                                    Panel AI
-                                    <ArrowUpRight className="inline h-3 w-3 ml-0.5" />
-                                </Link>
-                            </CardHeader>
-                            <CardContent>
-                                {recentActions.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground py-2 text-center">
-                                        Sin acciones del agente
-                                    </p>
-                                ) : (
-                                    <div className="space-y-1.5">
-                                        {recentActions.map((action) => (
-                                            <div
-                                                key={action.id}
-                                                className="flex items-center justify-between text-[11px] py-1 border-b border-dashed last:border-0"
-                                            >
-                                                <div className="flex items-center gap-1.5">
-                                                    <Zap className="h-3 w-3 text-purple-500" />
-                                                    <span className="font-medium">
-                                                        {action.action}
-                                                    </span>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[8px] h-4 px-1"
-                                                    >
-                                                        {action.source}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-muted-foreground">
-                                                    {timeSince(
-                                                        action.created_at,
-                                                    )}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Accounts Summary */}
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm">Cuentas</CardTitle>
-                                <Link href="/binance-accounts" className="text-[10px] text-muted-foreground hover:text-foreground">
-                                    Gestionar<ArrowUpRight className="inline h-3 w-3 ml-0.5" />
-                                </Link>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                    {[
-                                        { label: "Total", value: extended.accounts_total, color: "" },
-                                        { label: "Activas", value: extended.accounts_active, color: "text-green-500" },
-                                        { label: "Testnet", value: extended.accounts_testnet, color: "text-yellow-500" },
-                                        { label: "Órdenes", value: extended.total_orders, color: "" },
-                                    ].map(({ label, value, color }) => (
-                                        <div key={label} className="rounded-md bg-muted/30 px-2 py-1.5">
-                                            <p className="text-[10px] text-muted-foreground">{label}</p>
-                                            <p className={`font-bold ${color}`}>{value}</p>
+                                            <span className="text-muted-foreground">{timeSince(action.created_at)}</span>
                                         </div>
                                     ))}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Accounts Summary */}
+                    <Card className="lg:col-span-3">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm">Cuentas</CardTitle>
+                            <Link href="/binance-accounts" className="text-[10px] text-muted-foreground hover:text-foreground">
+                                Gestionar<ArrowUpRight className="inline h-3 w-3 ml-0.5" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                {[
+                                    { label: "Total", value: extended.accounts_total, color: "" },
+                                    { label: "Activas", value: extended.accounts_active, color: "text-green-500" },
+                                    { label: "Testnet", value: extended.accounts_testnet, color: "text-yellow-500" },
+                                    { label: "Órdenes", value: extended.total_orders, color: "" },
+                                ].map(({ label, value, color }) => (
+                                    <div key={label} className="rounded-md bg-muted/30 px-2 py-1.5">
+                                        <p className="text-[10px] text-muted-foreground">{label}</p>
+                                        <p className={`font-bold ${color}`}>{value}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </AuthenticatedLayout>
