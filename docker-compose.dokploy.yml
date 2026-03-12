@@ -64,7 +64,7 @@ services:
       - app-storage:/var/www/html/storage
     environment:
       - CONTAINER_ROLE=horizon
-      - APP_NAME=TradingBot
+      - APP_NAME=${APP_NAME-TradingBot}
       - APP_ENV=${APP_ENV-production}
       - APP_KEY=${APP_KEY}
       - APP_DEBUG=${APP_DEBUG-false}
@@ -78,6 +78,7 @@ services:
       - DB_DATABASE=${DB_DATABASE}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
+      - FILESYSTEM_DISK=local
       - QUEUE_CONNECTION=redis
       - CACHE_STORE=redis
       - REDIS_CLIENT=phpredis
