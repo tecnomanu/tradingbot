@@ -30,6 +30,7 @@ import { BinanceAccount } from "@/types/bot";
 import { sideColor, sideLabel } from "@/utils/botBadges";
 import { LEVERAGE_OPTIONS } from "@/utils/constants";
 import { Link } from "@inertiajs/react";
+import axios from "axios";
 import { ChevronDown, Info, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import PairSelector from "./PairSelector";
@@ -65,6 +66,7 @@ interface BotFormAdvancedProps {
     showGridLines?: boolean;
     onShowGridLinesChange?: (v: boolean) => void;
     botMode?: "futures" | "spot";
+    onPriceFetched?: (price: number) => void;
 }
 
 export default function BotFormAdvanced({
@@ -82,6 +84,7 @@ export default function BotFormAdvanced({
     showGridLines = true,
     onShowGridLinesChange,
     botMode = "futures",
+    onPriceFetched,
 }: BotFormAdvancedProps) {
     const [showLeverageModal, setShowLeverageModal] = useState(false);
     const [tempLeverage, setTempLeverage] = useState<number>(
@@ -90,19 +93,15 @@ export default function BotFormAdvanced({
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     useEffect(() => {
-        setData("name", `${data.symbol.replace("USDT", "")} Grid Bot`);
-    }, [data.symbol]);
+        if (!isEditing) {
+            setData("name", `${data.symbol.replace("USDT", "")} Grid Bot`);
+        }
+    }, [data.symbol, isEditing]);
 
     const isFutures = botMode === "futures";
     const investment = parseFloat(data.investment) || 0;
     const isInvestmentValid =
         balance !== null && investment <= balance && investment > 0;
-    const canCalculate =
-        !processing &&
-        !!data.price_lower &&
-        !!data.price_upper &&
-        !!data.binance_account_id &&
-        isInvestmentValid;
 
     const lev = isFutures ? (parseInt(data.leverage) || 1) : 1;
     const realInvestment = investment / lev;
@@ -123,6 +122,18 @@ export default function BotFormAdvanced({
 
     const priceLower = parseFloat(data.price_lower) || 0;
     const priceUpper = parseFloat(data.price_upper) || 0;
+    const gridCountNum = parseInt(data.grid_count, 10);
+    const gridCountInvalid = !isNaN(gridCountNum) && (gridCountNum < 2 || gridCountNum > 500);
+    const priceRangeInvalid = priceUpper > 0 && priceLower > 0 && priceUpper <= priceLower;
+
+    const canCalculate =
+        !processing &&
+        !!data.price_lower &&
+        !!data.price_upper &&
+        !!data.binance_account_id &&
+        isInvestmentValid &&
+        !priceRangeInvalid &&
+        !gridCountInvalid;
 
     const calculateRecommendedGrids = () => {
         if (priceLower <= 0 || priceUpper <= priceLower) return;
@@ -251,24 +262,48 @@ export default function BotFormAdvanced({
                         <Label className="text-xs font-medium">
                             1. Rango de precios
                         </Label>
-                        {currentPrice && (
+                        <div className="flex items-center gap-1.5">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    const lower = Math.round(
-                                        currentPrice * 0.95,
-                                    );
-                                    const upper = Math.round(
-                                        currentPrice * 1.05,
-                                    );
-                                    setData("price_lower", lower.toString());
-                                    setData("price_upper", upper.toString());
+                                onClick={async () => {
+                                    try {
+                                        const res = await axios.post<{ data?: { price?: number }; price?: number }>("/bots/current-price", { symbol: data.symbol });
+                                        const price = res.data?.data?.price ?? res.data?.price;
+                                        if (typeof price === "number" && price > 0) {
+                                            const lower = Math.round(price * 0.95);
+                                            const upper = Math.round(price * 1.05);
+                                            setData("price_lower", lower.toString());
+                                            setData("price_upper", upper.toString());
+                                            onPriceFetched?.(price);
+                                        }
+                                    } catch {
+                                        if (currentPrice && currentPrice > 0) {
+                                            const lower = Math.round(currentPrice * 0.95);
+                                            const upper = Math.round(currentPrice * 1.05);
+                                            setData("price_lower", lower.toString());
+                                            setData("price_upper", upper.toString());
+                                        }
+                                    }
                                 }}
                                 className="text-[10px] text-primary hover:underline"
                             >
-                                ±5% auto
+                                Obtener precio actual
                             </button>
-                        )}
+                            {currentPrice && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const lower = Math.round(currentPrice * 0.95);
+                                        const upper = Math.round(currentPrice * 1.05);
+                                        setData("price_lower", lower.toString());
+                                        setData("price_upper", upper.toString());
+                                    }}
+                                    className="text-[10px] text-primary hover:underline"
+                                >
+                                    ±5% auto
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
@@ -319,6 +354,11 @@ export default function BotFormAdvanced({
                             Precio actual: {currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} USDT
                         </p>
                     )}
+                    {priceLower > 0 && priceUpper > 0 && priceUpper <= priceLower && (
+                        <p className="text-[10px] text-destructive font-medium">
+                            El precio superior debe ser mayor al inferior
+                        </p>
+                    )}
                 </div>
 
                 <Separator />
@@ -356,9 +396,9 @@ export default function BotFormAdvanced({
                             Recomendado
                         </button>
                     </div>
-                    {errors.grid_count && (
+                    {(errors.grid_count || gridCountInvalid) && (
                         <p className="text-[10px] text-destructive">
-                            {errors.grid_count}
+                            {errors.grid_count || "La cantidad de rejillas debe estar entre 2 y 500"}
                         </p>
                     )}
                     <div className="flex items-center justify-between">

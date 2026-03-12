@@ -8,16 +8,25 @@ import {
     ArrowDown,
     ArrowUp,
     ArrowUpDown,
+    Download,
     RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { OrdersLayout } from "./OrdersLayout";
 
 interface Filters {
     status: string;
     side: string;
     symbol: string;
+    bot_id: string;
     sort: string;
     dir: string;
+}
+
+interface BotOption {
+    id: number;
+    name: string;
+    symbol: string;
 }
 
 interface OrderHistoryProps {
@@ -31,6 +40,7 @@ interface OrderHistoryProps {
     };
     filters: Filters;
     availableSymbols: string[];
+    availableBots?: BotOption[];
 }
 
 const STATUS_OPTIONS = [
@@ -116,6 +126,7 @@ export default function OrderHistory({
     orders,
     filters,
     availableSymbols,
+    availableBots,
 }: OrderHistoryProps) {
     const navigate = (params: Partial<Filters>) => {
         const merged = { ...filters, ...params };
@@ -143,10 +154,19 @@ export default function OrderHistory({
         })),
     ];
 
+    const botOptions = [
+        { value: "all", label: "Todos" },
+        ...(availableBots ?? []).map((b) => ({
+            value: String(b.id),
+            label: b.name || `${b.symbol.replace("USDT", "/USDT")}`,
+        })),
+    ];
+
     const hasActiveFilters =
         filters.status !== "all" ||
         filters.side !== "all" ||
-        filters.symbol !== "all";
+        filters.symbol !== "all" ||
+        filters.bot_id !== "all";
 
     return (
         <AuthenticatedLayout fullWidth>
@@ -155,8 +175,20 @@ export default function OrderHistory({
                 <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-semibold">
-                            Historial de Ordenes ({orders.total ?? orders.data.length})
+                            Historial de Ordenes{" "}
+                            {hasActiveFilters
+                                ? `(filtrado de ${orders.total} total)`
+                                : `(${orders.total})`}
                         </h2>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => toast.info("Próximamente")}
+                        >
+                            <Download className="mr-1 h-3 w-3" />
+                            Exportar
+                        </Button>
                     </div>
 
                     {/* Filters */}
@@ -178,6 +210,14 @@ export default function OrderHistory({
                             value={filters.symbol}
                             options={symbolOptions}
                             onChange={(v) => navigate({ symbol: v })}
+                        />
+                        <FilterSelect
+                            label="Bot"
+                            value={filters.bot_id}
+                            options={botOptions}
+                            onChange={(v) =>
+                                navigate({ bot_id: v })
+                            }
                         />
                         {hasActiveFilters && (
                             <Button
@@ -203,6 +243,9 @@ export default function OrderHistory({
                                     <tr className="border-b text-xs text-muted-foreground">
                                         <th className="pb-2 text-left font-medium">
                                             Par
+                                        </th>
+                                        <th className="pb-2 text-left font-medium">
+                                            Bot
                                         </th>
                                         <SortHeader
                                             label="Lado"
@@ -259,6 +302,9 @@ export default function OrderHistory({
                                                     "USDT",
                                                     "/USDT",
                                                 ) || "-"}
+                                            </td>
+                                            <td className="py-2.5 text-muted-foreground text-xs">
+                                                {order.bot?.name || "-"}
                                             </td>
                                             <td className="py-2.5">
                                                 <Badge

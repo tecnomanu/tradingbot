@@ -22,6 +22,14 @@ export default function Edit({
     telegramChatId: string | null;
     telegramConnected: boolean;
 }>) {
+    const successMessage =
+        status === "profile-updated"
+            ? "Perfil actualizado correctamente."
+            : status === "password-updated"
+              ? "Contraseña actualizada correctamente."
+              : status === "verification-link-sent"
+                ? "Se ha enviado un nuevo enlace de verificación."
+                : null;
     return (
         <AuthenticatedLayout
             header={
@@ -31,6 +39,14 @@ export default function Edit({
             }
         >
             <Head title="Perfil" />
+
+            {successMessage && (
+                <div className="mx-auto max-w-2xl px-4 sm:px-6 mb-4">
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+                        {successMessage}
+                    </div>
+                </div>
+            )}
 
             <div className="py-8 text-foreground">
                 <div className="mx-auto max-w-2xl px-4 sm:px-6">

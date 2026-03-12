@@ -14,6 +14,8 @@ import { useDarkMode } from "@/hooks/useDarkMode";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/utils/constants";
 import { Link, usePage } from "@inertiajs/react";
+import { useEffect } from "react";
+import { Toaster, toast } from "sonner";
 import {
     LogOut,
     Menu,
@@ -30,10 +32,15 @@ export default function AuthenticatedLayout({
     children,
     fullWidth = false,
 }: PropsWithChildren<{ header?: ReactNode; fullWidth?: boolean }>) {
-    const { auth } = usePage().props as any;
+    const { auth, flash } = usePage().props as { auth: { user: { name: string; email: string } }; flash?: { success?: string; error?: string } };
     const user = auth.user;
     const { isDark, toggle } = useDarkMode();
     const [mobileOpen, setMobileOpen] = useState(false);
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
 
     const isActive = (pattern: string) => {
         try {
@@ -65,6 +72,7 @@ export default function AuthenticatedLayout({
 
     return (
         <div className="min-h-screen bg-background">
+            <Toaster theme="system" richColors position="top-right" />
             {/* Top Navigation Bar */}
             <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex h-14 items-center gap-4 px-4 sm:px-6">

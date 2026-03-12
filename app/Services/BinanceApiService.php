@@ -54,7 +54,7 @@ class BinanceApiService
             return $this->futuresService->getAccountBalance($account);
         } catch (Exception $e) {
             Log::warning('Failed to get Binance balance', ['error' => $e->getMessage()]);
-            return ['balances' => [], 'total_usdt' => 0];
+            return ['balances' => [], 'available_usdt' => 0.0, 'total_usdt' => 0.0];
         }
     }
 

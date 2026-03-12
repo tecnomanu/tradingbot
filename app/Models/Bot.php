@@ -17,6 +17,7 @@ class Bot extends Model
         'symbol',
         'side',
         'status',
+        'last_error_message',
         'price_lower',
         'price_upper',
         'grid_count',

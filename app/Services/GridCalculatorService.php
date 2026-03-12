@@ -108,6 +108,8 @@ class GridCalculatorService
             ? $this->estimateLiquidationPrice($avgEntryPrice, $leverage, $side)
             : 0;
 
+        $step = ($priceUpper - $priceLower) / $gridCount;
+
         return [
             'grid_levels' => $gridLevels,
             'profit_per_grid' => $profitPerGrid,
@@ -116,6 +118,8 @@ class GridCalculatorService
             'additional_margin' => $investmentBreakdown['additional_margin'],
             'est_liquidation_price' => $estLiquidationPrice,
             'quantity_per_grid' => round($investment / ($gridCount * $avgEntryPrice), 8),
+            'grid_mode' => $gridMode,
+            'step_size' => round($step, 8),
         ];
     }
 }

@@ -1,3 +1,13 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 import { Check, Copy, RefreshCw } from "lucide-react";
@@ -8,14 +18,15 @@ interface Props {
 }
 
 export default function ApiKeyManager({ apiKey: initialKey }: Props) {
-    const [apiKey, setApiKey]         = useState(initialKey);
-    const [visible, setVisible]       = useState(false);
-    const [copied, setCopied]         = useState(false);
-    const [rotating, setRotating]     = useState(false);
+    const [apiKey, setApiKey] = useState(initialKey);
+    const [visible, setVisible] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const [rotating, setRotating] = useState(false);
     const [justRotated, setJustRotated] = useState(false);
+    const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
 
     const maskedKey = apiKey
-        ? apiKey.substring(0, 8) + "•".repeat(48) + apiKey.slice(-4)
+        ? apiKey.substring(0, 8) + "•".repeat(Math.min(48, Math.max(0, apiKey.length - 12))) + apiKey.slice(-4)
         : "";
 
     const copy = useCallback(async () => {
@@ -25,8 +36,7 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
     }, [apiKey]);
 
     const rotate = useCallback(async () => {
-        if (!confirm("¿Rotar la API key? La key anterior dejará de funcionar inmediatamente.")) return;
-
+        setRotateDialogOpen(false);
         setRotating(true);
         try {
             const { data } = await axios.post(route("profile.rotate-api-key"));
@@ -62,14 +72,21 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
                     </code>
                     <Button
                         variant="outline"
-                        size="icon"
+                        size="sm"
                         onClick={copy}
                         title="Copiar key"
+                        className="shrink-0 gap-1.5"
                     >
                         {copied ? (
-                            <Check className="h-4 w-4 text-green-500" />
+                            <>
+                                <Check className="h-3.5 w-3.5 text-green-500" />
+                                Copiado
+                            </>
                         ) : (
-                            <Copy className="h-4 w-4" />
+                            <>
+                                <Copy className="h-3.5 w-3.5" />
+                                Copiar
+                            </>
                         )}
                     </Button>
                 </div>
@@ -91,16 +108,38 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
                         Actualizá tu agente/MCP con la nueva key.
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={rotate}
-                    disabled={rotating}
-                    className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                >
-                    <RefreshCw className={`mr-2 h-3.5 w-3.5 ${rotating ? "animate-spin" : ""}`} />
-                    {rotating ? "Rotando…" : "Rotar Key"}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRotateDialogOpen(true)}
+                        disabled={rotating}
+                        className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                    >
+                        <RefreshCw className={`mr-2 h-3.5 w-3.5 ${rotating ? "animate-spin" : ""}`} />
+                        {rotating ? "Rotando…" : "Rotar Key"}
+                    </Button>
+                    <AlertDialog open={rotateDialogOpen} onOpenChange={setRotateDialogOpen}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Rotar la API key?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    La key anterior dejará de funcionar inmediatamente.
+                                    Actualizá tu agente o MCP con la nueva key.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={rotate}
+                                    className="bg-amber-600 hover:bg-amber-700"
+                                >
+                                    Rotar
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
             </div>
 
             <div className="rounded-lg border bg-muted/40 p-4 space-y-2">

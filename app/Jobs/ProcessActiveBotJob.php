@@ -17,7 +17,7 @@ class ProcessActiveBotJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
+    public int $tries = 3;
     public int $timeout = 120;
 
     public function __construct(
@@ -42,8 +42,10 @@ class ProcessActiveBotJob implements ShouldQueue, ShouldBeUnique
         } catch (\Exception $e) {
             Log::error('ProcessActiveBotJob: error', [
                 'bot_id' => $this->bot->id,
+                'attempt' => $this->attempts(),
                 'error' => $e->getMessage(),
             ]);
+            throw $e;
         }
     }
 

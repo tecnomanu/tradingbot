@@ -67,6 +67,7 @@ class BinanceFuturesService
         $items = method_exists($data, 'getItems') ? $data->getItems() : (is_array($data) ? $data : []);
 
         $balances = [];
+        $availableUsdt = 0.0;
         $totalUsdt = 0.0;
 
         foreach ($items as $item) {
@@ -82,13 +83,15 @@ class BinanceFuturesService
                 ];
 
                 if ($asset === 'USDT') {
-                    $totalUsdt = $available;
+                    $availableUsdt = $available;
+                    $totalUsdt = $balance;
                 }
             }
         }
 
         return [
             'balances' => $balances,
+            'available_usdt' => $availableUsdt,
             'total_usdt' => $totalUsdt,
         ];
     }

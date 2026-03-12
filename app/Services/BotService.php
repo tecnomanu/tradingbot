@@ -22,12 +22,22 @@ class BotService
 
     /**
      * Create a new bot with its grid orders (DB only, not yet placed on Binance).
+     *
+     * @throws \InvalidArgumentException When grid calculation fails
      */
     public function createBot(array $data): Bot
     {
-        return DB::transaction(function () use ($data) {
+        try {
             $gridConfig = $this->gridCalculator->calculateFullGridConfig($data);
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException(
+                'Error al calcular la configuración de la grilla: ' . $e->getMessage(),
+                0,
+                $e
+            );
+        }
 
+        return DB::transaction(function () use ($data, $gridConfig) {
             $botData = array_merge($data, [
                 'real_investment' => $gridConfig['real_investment'],
                 'additional_margin' => $gridConfig['additional_margin'],
@@ -102,6 +112,7 @@ class BotService
                 'investment' => $bot->investment,
                 'leverage' => $bot->leverage,
                 'side' => $bot->side->value,
+                'grid_mode' => $bot->grid_mode ?? 'arithmetic',
             ]),
         ];
     }

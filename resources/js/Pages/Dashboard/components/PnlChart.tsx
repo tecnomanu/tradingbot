@@ -26,10 +26,10 @@ export default function PnlChart({ data }: PnlChartProps) {
             </CardHeader>
             <CardContent>
                 {data.length === 0 ? (
-                    <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
+                    <div className="flex h-64 flex-col items-center justify-center text-center text-muted-foreground">
                         <BarChart3 className="h-10 w-10 opacity-30 mb-2" />
-                        <p className="text-sm">Sin datos de PNL aún</p>
-                        <p className="text-xs opacity-60">
+                        <p className="text-sm">No hay datos de PNL aún</p>
+                        <p className="text-xs opacity-60 mt-1">
                             Los datos aparecerán cuando el bot esté activo
                         </p>
                     </div>
@@ -96,6 +96,19 @@ export default function PnlChart({ data }: PnlChartProps) {
                                         }}
                                         axisLine={{
                                             stroke: "hsl(var(--border))",
+                                        }}
+                                        tickFormatter={(value) => {
+                                            if (!value) return "";
+                                            // Backend sends "m/d H:i" (e.g. "03/12 14:30")
+                                            const parts = String(value).split(" ");
+                                            const [datePart, timePart] = parts;
+                                            if (datePart && timePart) {
+                                                const [m, d] = datePart.split("/");
+                                                if (m && d) {
+                                                    return `${d}/${m} ${timePart}`;
+                                                }
+                                            }
+                                            return String(value);
                                         }}
                                     />
                                     <YAxis

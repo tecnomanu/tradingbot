@@ -52,11 +52,20 @@ class OrderRepository
 
     public function getBotOrderStats(int $botId): array
     {
+        $stats = Order::where('bot_id', $botId)
+            ->selectRaw('
+                COUNT(*) as total_orders,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as open_orders,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as filled_orders,
+                COALESCE(SUM(CASE WHEN status = ? THEN pnl ELSE 0 END), 0) as total_pnl
+            ', [OrderStatus::Open->value, OrderStatus::Filled->value, OrderStatus::Filled->value])
+            ->first();
+
         return [
-            'total_orders' => Order::where('bot_id', $botId)->count(),
-            'open_orders' => Order::where('bot_id', $botId)->open()->count(),
-            'filled_orders' => Order::where('bot_id', $botId)->where('status', OrderStatus::Filled)->count(),
-            'total_pnl' => Order::where('bot_id', $botId)->where('status', OrderStatus::Filled)->sum('pnl'),
+            'total_orders' => (int) ($stats->total_orders ?? 0),
+            'open_orders' => (int) ($stats->open_orders ?? 0),
+            'filled_orders' => (int) ($stats->filled_orders ?? 0),
+            'total_pnl' => (float) ($stats->total_pnl ?? 0),
         ];
     }
 

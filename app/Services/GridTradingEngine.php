@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BotSide;
 use App\Enums\BotStatus;
 use App\Enums\OrderSide;
 use App\Enums\OrderStatus;
@@ -140,6 +141,9 @@ class GridTradingEngine
     /**
      * Process an active bot: sync order statuses from Binance, handle fills, rotate grid.
      * Also checks stop-loss and take-profit conditions.
+     *
+     * Concurrency: ProcessActiveBotJob uses ShouldBeUnique with uniqueId per bot,
+     * so only one processBot run per bot can execute at a time. No additional locking needed here.
      */
     public function processBot(Bot $bot): void
     {
@@ -150,7 +154,10 @@ class GridTradingEngine
         $account = $bot->binanceAccount;
 
         if (!$account) {
-            $this->botRepository->update($bot, ['status' => BotStatus::Error]);
+            $this->botRepository->update($bot, [
+                'status' => BotStatus::Error,
+                'last_error_message' => 'No Binance account linked',
+            ]);
             return;
         }
 
@@ -168,6 +175,7 @@ class GridTradingEngine
 
             $this->botRepository->update($bot, [
                 'status' => BotStatus::Error,
+                'last_error_message' => $e->getMessage(),
             ]);
         }
     }
@@ -197,15 +205,34 @@ class GridTradingEngine
             return;
         }
 
+        $oldLower = (float) $bot->price_lower;
+        $oldUpper = (float) $bot->price_upper;
+        $range = $oldUpper - $oldLower;
+
+        // Center range based on bot side: Long = more room above (40%), Short = more room below (60%), Neutral = 50%
+        $side = $bot->side;
+        if ($side === BotSide::Long) {
+            $newLower = $currentPrice - 0.4 * $range;
+            $newUpper = $currentPrice + 0.6 * $range;
+        } elseif ($side === BotSide::Short) {
+            $newLower = $currentPrice - 0.6 * $range;
+            $newUpper = $currentPrice + 0.4 * $range;
+        } else {
+            $newLower = $currentPrice - 0.5 * $range;
+            $newUpper = $currentPrice + 0.5 * $range;
+        }
+
+        $newLower = $this->binance->formatPrice($bot->symbol, $newLower);
+        $newUpper = $this->binance->formatPrice($bot->symbol, $newUpper);
+
         Log::info('GridEngine: auto-rebuilding grid (0 open orders)', [
             'bot_id' => $bot->id,
+            'reason' => 'all_orders_filled',
             'current_price' => $currentPrice,
-            'old_range' => "{$bot->price_lower}-{$bot->price_upper}",
+            'old_range' => "{$oldLower}-{$oldUpper}",
+            'new_range' => "{$newLower}-{$newUpper}",
+            'side' => $side->value,
         ]);
-
-        $range = ($bot->price_upper - $bot->price_lower);
-        $newLower = round($currentPrice - $range / 2, 2);
-        $newUpper = round($currentPrice + $range / 2, 2);
 
         $this->botRepository->update($bot, [
             'price_lower' => $newLower,
@@ -213,11 +240,12 @@ class GridTradingEngine
         ]);
 
         $bot->refresh();
-        $this->rebuildGrid($bot, $currentPrice);
+        $placedCount = $this->rebuildGrid($bot, $currentPrice);
 
         Log::info('GridEngine: auto-rebuild complete', [
             'bot_id' => $bot->id,
             'new_range' => "{$newLower}-{$newUpper}",
+            'orders_placed' => $placedCount,
         ]);
     }
 
@@ -335,6 +363,13 @@ class GridTradingEngine
             );
 
             if (!$orderInfo) {
+                // Order not found on Binance (ghost order) - mark as Cancelled
+                $order->update(['status' => OrderStatus::Cancelled]);
+                Log::info('GridEngine: ghost order marked cancelled (not found on Binance)', [
+                    'bot_id' => $bot->id,
+                    'order_id' => $order->id,
+                    'binance_order_id' => $order->binance_order_id,
+                ]);
                 continue;
             }
 
@@ -453,6 +488,8 @@ class GridTradingEngine
             if ($placed) {
                 $order->update(['pnl' => $pnl]);
             } else {
+                // Still set pnl so we don't retry forever; autoRebuildIfEmpty will handle grid rebuild
+                $order->update(['pnl' => $pnl]);
                 Log::warning('GridEngine: counter-order failed, will retry next cycle', [
                     'bot_id' => $bot->id,
                     'filled_order_id' => $order->id,
@@ -586,10 +623,18 @@ class GridTradingEngine
     /**
      * Rebuild the entire grid from the bot's existing config.
      * Used when restarting a stopped bot that has no Open orders.
+     *
+     * @return int Number of orders successfully placed on Binance
      */
-    private function rebuildGrid(Bot $bot, float $currentPrice): void
+    private function rebuildGrid(Bot $bot, float $currentPrice): int
     {
         $account = $bot->binanceAccount;
+
+        // Prevent duplicate orders: cancel/delete any open orders not yet placed on Binance
+        $bot->orders()
+            ->where('status', OrderStatus::Open)
+            ->whereNull('binance_order_id')
+            ->delete();
 
         $gridConfig = $this->gridCalculator->calculateFullGridConfig([
             'price_lower' => $bot->price_lower,
@@ -666,6 +711,8 @@ class GridTradingEngine
             'placed' => $placedCount,
             'total' => $newOrders->count(),
         ]);
+
+        return $placedCount;
     }
 
     /**

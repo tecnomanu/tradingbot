@@ -20,10 +20,16 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Bot as BotType } from "@/types/bot";
 import { formatCurrency, sideLabel, statusLabel } from "@/utils/formatters";
 import { Link, router } from "@inertiajs/react";
-import { Play, Square } from "lucide-react";
+import { AlertCircle, Play, Square } from "lucide-react";
 
 interface BotCardProps {
     bot: BotType;

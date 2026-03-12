@@ -46,7 +46,10 @@ class InitializeBotJob implements ShouldQueue
             ]);
 
             if ($this->attempts() >= $this->tries) {
-                $this->bot->update(['status' => BotStatus::Error]);
+                $this->bot->update([
+                    'status' => BotStatus::Error,
+                    'last_error_message' => $e->getMessage(),
+                ]);
             }
 
             throw $e;

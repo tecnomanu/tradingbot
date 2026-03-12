@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { formatCurrency } from "@/utils/formatters";
 import { Head, Link } from "@inertiajs/react";
@@ -139,6 +140,14 @@ export default function Positions({ positions }: PositionsProps) {
                                                     </Link>
                                                 </div>
                                                 <div className="flex items-center gap-2">
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="text-[10px] font-normal"
+                                                    >
+                                                        {timeRunning(
+                                                            pos.started_at,
+                                                        )}
+                                                    </Badge>
                                                     <Badge
                                                         variant="outline"
                                                         className="text-[10px]"

@@ -28,6 +28,7 @@ interface ConfirmParamsModalProps {
     formData: FormData;
     isEditing?: boolean;
     editBotStatus?: string;
+    currentPrice?: number | null;
 }
 
 export default function ConfirmParamsModal({
@@ -39,8 +40,14 @@ export default function ConfirmParamsModal({
     formData,
     isEditing = false,
     editBotStatus,
+    currentPrice,
 }: ConfirmParamsModalProps) {
     const isActiveBot = isEditing && editBotStatus === "active";
+    const liqPrice = config.est_liquidation_price;
+    const liqPriceNearCurrent =
+        currentPrice &&
+        liqPrice > 0 &&
+        Math.abs((liqPrice - currentPrice) / currentPrice) < 0.1;
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>

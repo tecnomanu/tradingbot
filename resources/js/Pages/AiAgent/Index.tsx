@@ -17,10 +17,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import {
     Activity,
+    AlertTriangle,
     ArrowRight,
     Brain,
     Clock,
@@ -30,7 +39,8 @@ import {
     Sparkles,
     Wrench,
 } from "lucide-react";
-import { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import { Toaster, toast } from "sonner";
 
 interface Conversation {
     id: number;
@@ -138,6 +148,12 @@ function formatActionDetails(action: string, details: Record<string, any> | null
     }
 }
 
+const INCOMPLETE_ANALYSIS = "Agent did not complete analysis";
+
+function formatActionsTaken(actions: string[]): string {
+    return actions.map((a) => actionLabels[a] || a).join(", ");
+}
+
 function SectionDivider({ label }: { label: string }) {
     return (
         <div className="flex items-center gap-3 px-4 py-2 bg-muted/30">
@@ -188,15 +204,6 @@ export default function AiAgentIndex({
     const latestConversation = filteredConversations[0] ?? null;
     const olderConversations = filteredConversations.slice(1);
 
-    const latestActionGroup = useMemo(() => {
-        if (filteredActions.length === 0) return { latest: [], older: [] };
-        const firstId = filteredActions[0]?.conversation_id;
-        if (!firstId) return { latest: [filteredActions[0]], older: filteredActions.slice(1) };
-        const latest = filteredActions.filter((a) => a.conversation_id === firstId);
-        const older = filteredActions.filter((a) => a.conversation_id !== firstId);
-        return { latest, older };
-    }, [filteredActions]);
-
     const [consultDialogOpen, setConsultDialogOpen] = useState(false);
     const [consultBotId, setConsultBotId] = useState<string>("");
 
@@ -217,15 +224,20 @@ export default function AiAgentIndex({
         if (!botId) return;
         setConsultDialogOpen(false);
         setConsulting(true);
-        router.post(
-            "/ai-agent/consult",
-            { bot_id: botId },
-            { preserveScroll: true, onFinish: () => setConsulting(false) },
-        );
+        router.post("/ai-agent/consult", { bot_id: botId }, {
+            preserveScroll: true,
+            onFinish: () => setConsulting(false),
+        });
     };
+
+    // Show error toast when returning with flash.error (e.g. consult failed)
+    useEffect(() => {
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.error]);
 
     return (
         <AuthenticatedLayout>
+            <Toaster theme="system" richColors position="top-right" />
             <Head title="AI Agent" />
             <div className="mx-auto max-w-7xl space-y-6 p-4 text-foreground sm:p-6">
                 {/* Header */}
@@ -362,26 +374,48 @@ export default function AiAgentIndex({
                                     <div className="flex flex-col items-center gap-3 py-16 text-center">
                                         <Shield className="h-12 w-12 text-muted-foreground/30" />
                                         <p className="text-muted-foreground">Sin acciones registradas</p>
+                                        <p className="text-xs text-muted-foreground/80">
+                                            Las acciones del agente aparecerán aquí cuando ejecute cambios en tus bots.
+                                        </p>
                                     </div>
                                 ) : (
-                                    <>
-                                        {latestActionGroup.latest.length > 0 && (
-                                            <>
-                                                <SectionDivider label="Última acción" />
-                                                {latestActionGroup.latest.map((log) => (
-                                                    <ActionItem key={log.id} log={log} />
-                                                ))}
-                                            </>
-                                        )}
-                                        {latestActionGroup.older.length > 0 && (
-                                            <>
-                                                <SectionDivider label="Histórico" />
-                                                {latestActionGroup.older.map((log) => (
-                                                    <ActionItem key={log.id} log={log} />
-                                                ))}
-                                            </>
-                                        )}
-                                    </>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha</TableHead>
+                                                <TableHead>Tipo</TableHead>
+                                                <TableHead>Bot</TableHead>
+                                                <TableHead>Detalles</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredActions.map((log) => (
+                                                <TableRow key={log.id}>
+                                                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                                                        {formatTimestamp(new Date(log.created_at))}
+                                                        <br />
+                                                        <span className="text-[10px]">{timeAgo(new Date(log.created_at))}</span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className={`font-medium text-sm ${actionColors[log.action] || "text-foreground"}`}>
+                                                            {actionLabels[log.action] || log.action}
+                                                        </span>
+                                                        <Badge variant="outline" className="ml-1.5 text-[10px]">
+                                                            {log.source}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="text-[10px]">
+                                                            {log.bot?.symbol || `Bot #${log.bot_id}`}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                                                        {formatActionDetails(log.action, log.details) || "—"}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
                                 )}
                             </CardContent>
                         </Card>
@@ -471,6 +505,7 @@ export default function AiAgentIndex({
 function QuickAnalysisItem({ conv, highlight }: { conv: Conversation; highlight?: boolean }) {
     const d = new Date(conv.created_at);
     const hasActions = conv.actions_taken && conv.actions_taken.length > 0;
+    const isIncomplete = conv.summary === INCOMPLETE_ANALYSIS;
     const [expanded, setExpanded] = useState(false);
     const [clamped, setClamped] = useState(false);
     const textRef = useRef<HTMLParagraphElement>(null);
@@ -490,12 +525,23 @@ function QuickAnalysisItem({ conv, highlight }: { conv: Conversation; highlight?
             <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="text-xs">{conv.bot?.symbol ?? "?"}</Badge>
                 {hasActions ? (
-                    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-yellow-500/10 border-yellow-500/20 text-yellow-400">
-                        {conv.actions_taken!.length} {conv.actions_taken!.length === 1 ? "acción" : "acciones"}
+                    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-orange-500/10 border-orange-500/20 text-orange-400">
+                        Acción tomada
                     </span>
                 ) : (
                     <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
-                        sin cambios
+                        Sin cambios
+                    </span>
+                )}
+                {hasActions && conv.actions_taken && (
+                    <span className="text-xs text-muted-foreground">
+                        ({formatActionsTaken(conv.actions_taken)})
+                    </span>
+                )}
+                {isIncomplete && (
+                    <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-amber-500/10 border-amber-500/20 text-amber-400">
+                        <AlertTriangle className="h-3 w-3" />
+                        Sin análisis
                     </span>
                 )}
                 <span className="text-xs text-muted-foreground">{conv.total_tool_calls} tools</span>
@@ -525,34 +571,10 @@ function QuickAnalysisItem({ conv, highlight }: { conv: Conversation; highlight?
     );
 }
 
-function ActionItem({ log }: { log: ActionLog }) {
-    const d = new Date(log.created_at);
-    const details = formatActionDetails(log.action, log.details);
-
-    return (
-        <div className="flex items-center justify-between gap-4 p-4">
-            <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <span className={`font-medium text-sm ${actionColors[log.action] || "text-foreground"}`}>
-                    {actionLabels[log.action] || log.action}
-                </span>
-                <Badge variant="outline" className="text-[10px]">{log.source}</Badge>
-                <Badge variant="secondary" className="text-[10px]">
-                    {log.bot?.symbol || `Bot #${log.bot_id}`}
-                </Badge>
-                {details && (
-                    <span className="text-xs text-muted-foreground truncate">{details}</span>
-                )}
-            </div>
-            <span className="whitespace-nowrap text-xs text-muted-foreground">
-                {formatTimestamp(d)} · {timeAgo(d)}
-            </span>
-        </div>
-    );
-}
-
 function ConversationItem({ conv, highlight }: { conv: Conversation; highlight?: boolean }) {
     const d = new Date(conv.created_at);
     const hasActions = conv.actions_taken && conv.actions_taken.length > 0;
+    const isIncomplete = conv.summary === INCOMPLETE_ANALYSIS;
     const displayText = conv.analysis || conv.summary;
 
     return (
@@ -563,6 +585,26 @@ function ConversationItem({ conv, highlight }: { conv: Conversation; highlight?:
             <div className="flex-1 space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{conv.bot?.symbol || "?"}</span>
+                    {hasActions ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-orange-500/10 border-orange-500/20 text-orange-400">
+                            Acción tomada
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
+                            Sin cambios
+                        </span>
+                    )}
+                    {hasActions && conv.actions_taken && (
+                        <span className="text-xs text-muted-foreground">
+                            ({formatActionsTaken(conv.actions_taken)})
+                        </span>
+                    )}
+                    {isIncomplete && (
+                        <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium bg-amber-500/10 border-amber-500/20 text-amber-400">
+                            <AlertTriangle className="h-3 w-3" />
+                            Sin análisis
+                        </span>
+                    )}
                     <Badge
                         variant={
                             conv.status === "completed"
@@ -580,15 +622,18 @@ function ConversationItem({ conv, highlight }: { conv: Conversation; highlight?:
                         <span className="text-[10px] text-muted-foreground">· {conv.model}</span>
                     )}
                 </div>
-                {displayText && (
+                {displayText && !isIncomplete && (
                     <p className="text-sm text-muted-foreground line-clamp-2">{displayText}</p>
+                )}
+                {isIncomplete && (
+                    <p className="text-sm text-amber-400/90 italic">El agente no completó el análisis</p>
                 )}
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                     <span>{conv.total_tool_calls} tools</span>
                     <span>{conv.total_tokens} tokens</span>
                     {conv.duration_ms && <span>{(conv.duration_ms / 1000).toFixed(1)}s</span>}
                     {hasActions && (
-                        <span className="text-yellow-400">
+                        <span className="text-orange-400">
                             {conv.actions_taken!.length} acciones
                         </span>
                     )}

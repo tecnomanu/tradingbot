@@ -17,6 +17,7 @@ export interface Bot {
     symbol: string;
     side: BotSide;
     status: BotStatus;
+    last_error_message?: string | null;
     price_lower: number;
     price_upper: number;
     grid_count: number;
@@ -93,6 +94,18 @@ export interface GridConfig {
     additional_margin: number;
     est_liquidation_price: number;
     quantity_per_grid: number;
+    grid_mode?: string;
+    step_size?: number;
+}
+
+export interface RecentFill {
+    id: number;
+    side: string;
+    price: number;
+    quantity: number;
+    pnl: number;
+    filled_at: string | null;
+    filled_at_fmt: string;
 }
 
 export interface GridLimits {

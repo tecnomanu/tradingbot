@@ -54,6 +54,10 @@ class OrderController extends Controller
             $query->whereHas('bot', fn ($q) => $q->where('symbol', $request->symbol));
         }
 
+        if ($request->filled('bot_id') && $request->bot_id !== 'all') {
+            $query->where('bot_id', $request->bot_id);
+        }
+
         $sortField = $request->get('sort', 'created_at');
         $sortDir = $request->get('dir', 'desc');
         $allowedSorts = ['created_at', 'filled_at', 'price', 'quantity', 'pnl', 'status', 'side'];
@@ -92,13 +96,12 @@ class OrderController extends Controller
             ->withCount([
                 'orders as open_orders_count' => fn ($q) => $q->where('status', 'open'),
                 'orders as filled_orders_count' => fn ($q) => $q->where('status', 'filled'),
+                'orders as filled_24h_count' => fn ($q) => $q->where('status', 'filled')
+                    ->where('filled_at', '>=', now()->subDay()),
             ])
             ->get()
             ->map(function ($bot) {
-                $filled24h = $bot->orders()
-                    ->where('status', 'filled')
-                    ->where('filled_at', '>=', now()->subDay())
-                    ->count();
+                $filled24h = (int) ($bot->filled_24h_count ?? 0);
 
                 return [
                     'id' => $bot->id,

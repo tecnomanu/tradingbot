@@ -143,11 +143,31 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
                         </span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Chat ID: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{chatId}</code>
+                        Chat ID:{" "}
+                        <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
+                            {chatId}
+                        </code>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                        Activá las notificaciones en cada bot desde su pestaña AI Agent.
+                        Activá las notificaciones en cada bot desde su pestaña
+                        AI Agent.
                     </p>
+                    <div className="rounded border border-emerald-500/20 bg-muted/30 p-3 mt-2">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                            Eventos disponibles para notificaciones
+                        </p>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                            <li>• Ajuste de grid</li>
+                            <li>• Bot detenido</li>
+                            <li>• Stop loss configurado</li>
+                            <li>• Take profit configurado</li>
+                            <li>• Posición cerrada</li>
+                            <li>• Órdenes canceladas</li>
+                        </ul>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Configurá qué eventos recibir en cada bot.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">

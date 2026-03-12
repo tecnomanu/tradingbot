@@ -139,6 +139,12 @@ class BotController extends Controller
     {
         $this->authorizeBot($request, $bot);
 
+        $bot->loadCount([
+            'orders as open_orders_count' => fn ($q) => $q->where('status', 'open'),
+            'orders as filled_24h_count' => fn ($q) => $q->where('status', 'filled')
+                ->where('filled_at', '>=', now()->subDay()),
+        ]);
+
         $summary = $this->botService->getBotSummary($bot);
         $orders = $this->orderRepository->getByBot($bot->id);
         $pnlHistory = $this->pnlService->getHistoricalPnl($bot->id);
@@ -159,11 +165,8 @@ class BotController extends Controller
         }
 
         $lastOrderAt = $bot->orders()->latest('updated_at')->value('updated_at');
-        $activeOrdersCount = $bot->orders()->where('status', 'open')->count();
-        $filledToday = $bot->orders()
-            ->where('status', 'filled')
-            ->where('filled_at', '>=', now()->subDay())
-            ->count();
+        $activeOrdersCount = (int) ($bot->open_orders_count ?? 0);
+        $filledToday = (int) ($bot->filled_24h_count ?? 0);
 
         $chartOrders = $bot->orders()
             ->whereIn('status', ['open', 'filled'])
@@ -177,6 +180,19 @@ class BotController extends Controller
                 'quantity' => (float) $o->quantity,
                 'time' => ($o->filled_at ?? $o->created_at)?->timestamp,
                 'created_at_fmt' => $o->created_at?->format('d/m H:i'),
+                'filled_at_fmt' => $o->filled_at?->format('d/m H:i'),
+            ])
+            ->values();
+
+        $recentFills = $this->orderRepository->getFilledByBot($bot->id)
+            ->take(50)
+            ->map(fn ($o) => [
+                'id' => $o->id,
+                'side' => $o->side->value,
+                'price' => (float) $o->price,
+                'quantity' => (float) $o->quantity,
+                'pnl' => (float) ($o->pnl ?? 0),
+                'filled_at' => $o->filled_at?->toIso8601String(),
                 'filled_at_fmt' => $o->filled_at?->format('d/m H:i'),
             ])
             ->values();
@@ -195,6 +211,7 @@ class BotController extends Controller
                 'rounds_24h' => (int) floor($filledToday / 2),
             ],
             'chartOrders' => $chartOrders,
+            'recentFills' => $recentFills,
         ]);
     }
 

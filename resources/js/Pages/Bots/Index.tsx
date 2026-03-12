@@ -197,6 +197,19 @@ export default function Index({
                                 </div>
                             )}
 
+                            {binanceAccounts.length === 0 && (
+                                <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-3 flex items-center justify-between gap-4">
+                                    <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                                        Necesitás configurar una cuenta Binance primero
+                                    </span>
+                                    <Link
+                                        href="/binance-accounts"
+                                        className="text-sm font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                                    >
+                                        Ir a cuentas Binance →
+                                    </Link>
+                                </div>
+                            )}
                             <TickerBar
                                 symbol={chartSymbol}
                                 onPriceUpdate={setCurrentPrice}
@@ -296,6 +309,7 @@ export default function Index({
                                                     showGridLines={showGridLines}
                                                     onShowGridLinesChange={setShowGridLines}
                                                     botMode={botMode}
+                                                    onPriceFetched={setCurrentPrice}
                                                 />
                                             </div>
                                         </div>
@@ -340,6 +354,7 @@ export default function Index({
                     formData={data}
                     isEditing={isEditing}
                     editBotStatus={editBot?.status}
+                    currentPrice={currentPrice}
                 />
             )}
         </AuthenticatedLayout>

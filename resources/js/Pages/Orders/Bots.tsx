@@ -180,7 +180,7 @@ function BotCard({ bot }: { bot: Bot }) {
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
                 <div>
                     <span className="text-muted-foreground">
-                        Inversión real(USDT)
+                        Margen real (USDT)
                     </span>
                     <p className="font-semibold tabular-nums mt-0.5">
                         {formatCurrency(bot.real_investment)}
@@ -258,9 +258,11 @@ function BotCard({ bot }: { bot: Bot }) {
             {/* Bottom row */}
             <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
                 <div>
-                    <span className="text-muted-foreground">Inv. total</span>
+                    <span className="text-muted-foreground">
+                        Inv. total (capital + margen)
+                    </span>
                     <p className="tabular-nums">
-                        ${formatCurrency(bot.investment)}
+                        {formatCurrency(bot.investment)}
                     </p>
                 </div>
                 <div className="text-center">

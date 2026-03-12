@@ -26,7 +26,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Bot as BotIcon, Eye, Pencil, Play, Square } from "lucide-react";
+import { AlertCircle, Bot as BotIcon, Eye, Pencil, Play, Square } from "lucide-react";
 import { useState } from "react";
 
 interface BotTableProps {
@@ -141,18 +141,29 @@ function BotRow({ bot }: { bot: Bot }) {
         <TooltipProvider delayDuration={200}>
             <div className="grid grid-cols-[1.5fr_100px_0.8fr_0.8fr_0.8fr_1fr_0.7fr_0.7fr] items-center text-xs border-b px-4 py-3 hover:bg-muted/20 transition-colors">
                 <div className="flex items-center gap-2">
-                    <div
-                        className={cn(
-                            "w-1.5 h-1.5 rounded-full shrink-0",
-                            bot.status === "active"
-                                ? "bg-green-500 pulse-active"
-                                : bot.status === "pending"
-                                  ? "bg-yellow-500"
-                                  : bot.status === "error"
-                                    ? "bg-red-500"
-                                    : "bg-muted-foreground",
-                        )}
-                    />
+                    {bot.status === "error" ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="inline-flex text-red-500 shrink-0 cursor-help">
+                                    <AlertCircle className="h-4 w-4" />
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-[280px] text-xs">
+                                {(bot as { last_error_message?: string | null }).last_error_message ?? "Error en el bot"}
+                            </TooltipContent>
+                        </Tooltip>
+                    ) : (
+                        <div
+                            className={cn(
+                                "w-1.5 h-1.5 rounded-full shrink-0",
+                                bot.status === "active"
+                                    ? "bg-green-500 pulse-active"
+                                    : bot.status === "pending"
+                                      ? "bg-yellow-500"
+                                      : "bg-muted-foreground",
+                            )}
+                        />
+                    )}
                     <div className="min-w-0">
                         <span className="font-medium">
                             {bot.symbol.replace("USDT", "/USDT")} Grid Bot

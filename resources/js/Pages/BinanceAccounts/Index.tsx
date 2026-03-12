@@ -13,10 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { BinanceAccount } from "@/types/bot";
-import { Head, useForm } from "@inertiajs/react";
-import { router } from "@inertiajs/react";
+import { Head, useForm, router } from "@inertiajs/react";
 import axios from "axios";
-import { CheckCircle, Key, Loader2, Plus, Trash2, Wifi, XCircle } from "lucide-react";
+import { CheckCircle, DollarSign, Key, Loader2, Plus, Trash2, Wifi, XCircle } from "lucide-react";
 import { useState } from "react";
 
 interface BinanceAccountsProps {
@@ -29,6 +28,10 @@ export default function Index({ accounts }: BinanceAccountsProps) {
         Record<number, { success: boolean; message: string }>
     >({});
     const [showForm, setShowForm] = useState(false);
+    const [balanceLoading, setBalanceLoading] = useState<number | null>(null);
+    const [balances, setBalances] = useState<
+        Record<number, { available_usdt: number; total_usdt: number }>
+    >({});
 
     const { data, setData, post, processing, errors, reset } = useForm({
         label: "",
@@ -39,7 +42,7 @@ export default function Index({ accounts }: BinanceAccountsProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post("/binance-accounts", {
+        post(route("binance-accounts.store"), {
             preserveScroll: true,
             onSuccess: () => {
                 reset();
@@ -51,24 +54,53 @@ export default function Index({ accounts }: BinanceAccountsProps) {
     const handleTest = async (accountId: number) => {
         setTesting(accountId);
         try {
-            const res = await axios.post(`/binance-accounts/${accountId}/test`);
+            const res = await axios.post(
+                route("binance-accounts.test", accountId)
+            );
             setTestResult((prev) => ({
                 ...prev,
                 [accountId]: {
                     success: res.data.success,
-                    message: res.data.message,
+                    message: res.data.message ?? "Conexión exitosa",
                 },
             }));
-        } catch (err: any) {
+            if (res.data.success) {
+                handleFetchBalance(accountId);
+            }
+        } catch (err: unknown) {
+            const message =
+                (err as { response?: { data?: { message?: string } } })
+                    ?.response?.data?.message || "Error de conexión";
             setTestResult((prev) => ({
                 ...prev,
-                [accountId]: {
-                    success: false,
-                    message: err.response?.data?.message || "Error de conexión",
-                },
+                [accountId]: { success: false, message },
             }));
         } finally {
             setTesting(null);
+        }
+    };
+
+    const handleFetchBalance = async (accountId: number) => {
+        setBalanceLoading(accountId);
+        try {
+            const res = await axios.get(
+                route("binance-accounts.balance", accountId)
+            );
+            const d = res.data?.data ?? res.data;
+            setBalances((prev) => ({
+                ...prev,
+                [accountId]: {
+                    available_usdt: d?.available_usdt ?? 0,
+                    total_usdt: d?.total_usdt ?? 0,
+                },
+            }));
+        } catch {
+            setBalances((prev) => ({
+                ...prev,
+                [accountId]: { available_usdt: 0, total_usdt: 0 },
+            }));
+        } finally {
+            setBalanceLoading(null);
         }
     };
 
@@ -203,19 +235,33 @@ export default function Index({ accounts }: BinanceAccountsProps) {
             )}
 
             {accounts.length === 0 && !showForm ? (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 px-6 text-center">
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 mb-4">
                         <Key className="h-8 w-8 text-amber-500" />
                     </div>
                     <h2 className="text-lg font-semibold">
                         Sin cuentas configuradas
                     </h2>
-                    <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                        Agregá tu API Key de Binance para comenzar a operar con
-                        los grid bots.
+                    <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                        Para operar con los grid bots necesitás una API Key de
+                        Binance Futures. Creala en{" "}
+                        <a
+                            href="https://www.binance.com/es/my/settings/api-management"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-500 underline hover:no-underline"
+                        >
+                            Binance → API Management
+                        </a>
+                        . Activá permisos de lectura y trading de Futuros.
                     </p>
-                    <Button onClick={() => setShowForm(true)} className="mt-6">
-                        Agregar primera cuenta
+                    <Button
+                        onClick={() => setShowForm(true)}
+                        className="mt-6"
+                        size="lg"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Agregar cuenta
                     </Button>
                 </div>
             ) : (
@@ -232,15 +278,28 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                                             {account.label}
                                         </CardTitle>
                                     </div>
-                                    <div className="flex gap-1">
+                                    <div className="flex flex-wrap gap-1">
                                         {account.is_testnet && (
-                                            <Badge variant="outline">
+                                            <Badge
+                                                variant="secondary"
+                                                className="bg-muted text-muted-foreground"
+                                            >
                                                 Testnet
                                             </Badge>
                                         )}
-                                        {account.is_active && (
-                                            <Badge variant="default">
+                                        {account.is_active ? (
+                                            <Badge
+                                                variant="default"
+                                                className="bg-emerald-600 hover:bg-emerald-600"
+                                            >
                                                 Activa
+                                            </Badge>
+                                        ) : (
+                                            <Badge
+                                                variant="outline"
+                                                className="border-muted-foreground/30 text-muted-foreground"
+                                            >
+                                                Inactiva
                                             </Badge>
                                         )}
                                     </div>
@@ -270,6 +329,32 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                                     </span>
                                 </div>
 
+                                {(balances[account.id] ||
+                                    balanceLoading === account.id) && (
+                                    <div className="flex items-center justify-between rounded-lg bg-muted/50 p-2">
+                                        <span className="text-muted-foreground">
+                                            Balance USDT
+                                        </span>
+                                        {balanceLoading === account.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                        ) : (
+                                            <span className="font-medium tabular-nums">
+                                                {balances[account.id]
+                                                    ?.available_usdt?.toLocaleString(
+                                                        "es-AR",
+                                                        {
+                                                            minimumFractionDigits: 2,
+                                                            maximumFractionDigits: 2,
+                                                        }
+                                                    ) ?? "—"}{" "}
+                                                <span className="text-xs font-normal text-muted-foreground">
+                                                    disp.
+                                                </span>
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
                                 {testResult[account.id] && (
                                     <div
                                         className={`mt-2 flex items-center gap-2 rounded-lg p-2 text-xs ${testResult[account.id].success ? "bg-green-500/10 text-green-500" : "bg-destructive/10 text-destructive"}`}
@@ -283,11 +368,11 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                                     </div>
                                 )}
                             </CardContent>
-                            <CardFooter className="flex gap-2">
+                            <CardFooter className="flex flex-wrap gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="flex-1"
+                                    className="flex-1 min-w-[80px]"
                                     onClick={() => handleTest(account.id)}
                                     disabled={testing === account.id}
                                 >
@@ -304,6 +389,24 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                                     )}
                                 </Button>
                                 <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 min-w-[80px]"
+                                    onClick={() =>
+                                        handleFetchBalance(account.id)
+                                    }
+                                    disabled={balanceLoading === account.id}
+                                >
+                                    {balanceLoading === account.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <DollarSign className="mr-2 h-3 w-3" />{" "}
+                                            Ver balance
+                                        </>
+                                    )}
+                                </Button>
+                                <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-destructive hover:text-destructive"
@@ -314,7 +417,10 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                                             )
                                         )
                                             router.delete(
-                                                `/binance-accounts/${account.id}`,
+                                                route(
+                                                    "binance-accounts.destroy",
+                                                    account.id
+                                                )
                                             );
                                     }}
                                 >

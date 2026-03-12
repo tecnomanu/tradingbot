@@ -22,6 +22,7 @@ import {
     GridConfig,
     Order,
     OrderStats,
+    RecentFill,
 } from "@/types/bot";
 import {
     leverageLabel,
@@ -33,6 +34,7 @@ import {
 import {
     formatCurrency,
     formatDate,
+    formatPercent,
     sideLabel,
     statusLabel,
 } from "@/utils/formatters";
@@ -47,6 +49,7 @@ import {
     Loader2,
     Pencil,
     Play,
+    RefreshCw,
     Save,
     Trash2,
     XCircle,
@@ -87,6 +90,7 @@ interface ShowProps {
     gridConfig: GridConfig;
     orders: { data: Order[]; current_page: number; last_page: number };
     pnlHistory: BotPnlSnapshot[];
+    recentFills?: RecentFill[];
     position?: BinancePosition | null;
     activity: ActivityInfo;
     chartOrders?: ChartOrder[];
@@ -109,11 +113,15 @@ export default function Show({
     gridConfig,
     orders,
     pnlHistory,
+    recentFills = [],
     position,
     activity,
     chartOrders = [],
 }: ShowProps) {
     const isRunning = bot.status === "active";
+    const roiPct = bot.real_investment
+        ? (Number(bot.total_pnl) / Number(bot.real_investment)) * 100
+        : 0;
     const hasRecentActivity =
         activity.last_order_at &&
         Date.now() - new Date(activity.last_order_at).getTime() < 300000;
@@ -259,17 +267,36 @@ export default function Show({
                                 </AlertDialog>
                             )
                         )}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => {
-                                if (confirm("¿Eliminar este bot?"))
-                                    router.delete(`/bots/${bot.id}`);
-                            }}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                        ¿Eliminar bot {bot.symbol.replace("USDT", "/USDT")}?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Esta acción es irreversible. Se eliminará el bot y todo su historial de órdenes.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={() => router.delete(`/bots/${bot.id}`)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                        Eliminar
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 </div>
             }
@@ -277,39 +304,50 @@ export default function Show({
             <Head title={`Bot - ${bot.name}`} />
 
             {/* Activity Banner */}
-            <div className="mb-4 flex items-center gap-3 rounded-lg border px-4 py-2.5 bg-card/50">
-                <div className="flex items-center gap-2">
-                    {isRunning ? (
-                        hasRecentActivity ? (
-                            <span className="relative flex h-2.5 w-2.5">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-                            </span>
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 bg-card/50">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        {isRunning ? (
+                            hasRecentActivity ? (
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                                </span>
+                            ) : (
+                                <Activity className="h-3.5 w-3.5 text-yellow-500" />
+                            )
                         ) : (
-                            <Activity className="h-3.5 w-3.5 text-yellow-500" />
-                        )
-                    ) : (
-                        <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                    <span className="text-xs font-medium">
-                        {isRunning
-                            ? hasRecentActivity
-                                ? "Operando activamente"
-                                : "Bot activo, esperando movimiento"
-                            : "Bot detenido"}
-                    </span>
+                            <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                        <span className="text-xs font-medium">
+                            {isRunning
+                                ? hasRecentActivity
+                                    ? "Operando activamente"
+                                    : "Bot activo, esperando movimiento"
+                                : "Bot detenido"}
+                        </span>
+                    </div>
+                    <span className="text-muted-foreground">·</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        Última orden: {timeSince(activity.last_order_at)}
+                    </div>
+                    <span className="text-muted-foreground">·</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <CheckCircle className="h-3 w-3" />
+                        {activity.active_orders} abiertas · {activity.filled_24h}{" "}
+                        ejecutadas 24h · {activity.rounds_24h} rondas 24h
+                    </div>
                 </div>
-                <span className="text-muted-foreground">·</span>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    Última orden: {timeSince(activity.last_order_at)}
-                </div>
-                <span className="text-muted-foreground">·</span>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <CheckCircle className="h-3 w-3" />
-                    {activity.active_orders} abiertas · {activity.filled_24h}{" "}
-                    ejecutadas 24h · {activity.rounds_24h} rondas 24h
-                </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => router.reload()}
+                >
+                    <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                    Actualizar
+                </Button>
             </div>
 
             {/* Stats Banner */}
@@ -744,12 +782,15 @@ export default function Show({
                                                         fill: "hsl(var(--muted-foreground))",
                                                         fontSize: 10,
                                                     }}
+                                                    interval="preserveStartEnd"
+                                                    minTickGap={40}
                                                 />
                                                 <YAxis
                                                     tick={{
                                                         fill: "hsl(var(--muted-foreground))",
                                                         fontSize: 10,
                                                     }}
+                                                    tickFormatter={(v) => `${v >= 0 ? "+" : ""}${formatCurrency(v)}`}
                                                 />
                                                 <Tooltip
                                                     contentStyle={{
@@ -759,6 +800,8 @@ export default function Show({
                                                         borderRadius: "8px",
                                                         fontSize: "12px",
                                                     }}
+                                                    formatter={(value: number | undefined) => [`${(value ?? 0) >= 0 ? "+" : ""}${formatCurrency(value ?? 0)} USDT`, "PNL"]}
+                                                    labelFormatter={(label) => `Fecha: ${label}`}
                                                 />
                                                 <Area
                                                     type="monotone"
@@ -771,74 +814,16 @@ export default function Show({
                                         </ResponsiveContainer>
                                     </div>
                                 ) : (
-                                    <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                                        Sin datos de PNL aún
+                                    <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <p>Sin datos de PNL aún</p>
+                                        <p className="text-xs">
+                                            Los datos aparecerán cuando el bot esté activo y se registren snapshots
+                                        </p>
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
                     </div>
-
-                    {position && position.positionAmt !== 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-sm">
-                                    Posición en Binance
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                                    {[
-                                        {
-                                            label: "Tamaño",
-                                            value: `${position.positionAmt} ${bot.symbol.replace("USDT", "")}`,
-                                        },
-                                        {
-                                            label: "Precio entrada",
-                                            value: `${formatCurrency(position.entryPrice, 2)} USDT`,
-                                        },
-                                        {
-                                            label: "PNL no realizado",
-                                            value: `${position.unrealizedProfit >= 0 ? "+" : ""}${formatCurrency(position.unrealizedProfit)} USDT`,
-                                            color:
-                                                position.unrealizedProfit >= 0
-                                                    ? "text-green-500"
-                                                    : "text-destructive",
-                                        },
-                                        {
-                                            label: "Precio liquidación",
-                                            value:
-                                                position.liquidationPrice > 0
-                                                    ? `${formatCurrency(position.liquidationPrice, 1)} USDT`
-                                                    : "N/A",
-                                        },
-                                        {
-                                            label: "Lado posición",
-                                            value:
-                                                position.positionAmt > 0
-                                                    ? "LONG"
-                                                    : "SHORT",
-                                            color:
-                                                position.positionAmt > 0
-                                                    ? "text-green-500"
-                                                    : "text-destructive",
-                                        },
-                                    ].map((item, i) => (
-                                        <div key={i} className="space-y-1">
-                                            <p className="text-xs text-muted-foreground">
-                                                {item.label}
-                                            </p>
-                                            <p
-                                                className={`text-sm font-semibold tabular-nums ${item.color || ""}`}
-                                            >
-                                                {item.value}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
                 </TabsContent>
 
                 <TabsContent value="ordenes">
@@ -956,7 +941,7 @@ export default function Show({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-sm">
-                                Historial PNL
+                                PNL Acumulado
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -1015,12 +1000,15 @@ export default function Show({
                                                     fill: "hsl(var(--muted-foreground))",
                                                     fontSize: 10,
                                                 }}
+                                                interval="preserveStartEnd"
+                                                minTickGap={40}
                                             />
                                             <YAxis
                                                 tick={{
                                                     fill: "hsl(var(--muted-foreground))",
                                                     fontSize: 10,
                                                 }}
+                                                tickFormatter={(v) => `${v >= 0 ? "+" : ""}${formatCurrency(v)}`}
                                             />
                                             <Tooltip
                                                 contentStyle={{
@@ -1030,6 +1018,11 @@ export default function Show({
                                                     borderRadius: "8px",
                                                     fontSize: "12px",
                                                 }}
+                                                formatter={(value, name) => [
+                                                    `${(Number(value) ?? 0) >= 0 ? "+" : ""}${formatCurrency(Number(value) ?? 0)} USDT`,
+                                                    String(name ?? "PNL"),
+                                                ]}
+                                                labelFormatter={(label) => `Fecha: ${label}`}
                                             />
                                             <Area
                                                 type="monotone"
@@ -1051,9 +1044,73 @@ export default function Show({
                                     </ResponsiveContainer>
                                 </div>
                             ) : (
-                                <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-                                    Los datos aparecerán cuando el bot esté
-                                    activo
+                                <div className="flex h-72 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                                    <p>Sin datos de PNL aún</p>
+                                    <p className="text-xs">
+                                        Los datos aparecerán cuando el bot esté activo y se registren snapshots
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm">
+                                Últimas ejecuciones (PNL por transacción)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {recentFills.length > 0 ? (
+                                <div className="max-h-80 overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b text-muted-foreground">
+                                                <th className="pb-2 text-left font-medium">Fecha</th>
+                                                <th className="pb-2 text-left font-medium">Lado</th>
+                                                <th className="pb-2 text-left font-medium">Precio</th>
+                                                <th className="pb-2 text-right font-medium">Cantidad</th>
+                                                <th className="pb-2 text-right font-medium">PNL</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {recentFills.map((fill) => (
+                                                <tr key={fill.id} className="hover:bg-accent/50">
+                                                    <td className="py-2 text-muted-foreground">
+                                                        {fill.filled_at_fmt}
+                                                    </td>
+                                                    <td className="py-2">
+                                                        <span className={fill.side === "buy" ? "text-green-500" : "text-red-500"}>
+                                                            {fill.side === "buy" ? "Compra" : "Venta"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2 font-mono tabular-nums">
+                                                        {formatCurrency(fill.price, 2)}
+                                                    </td>
+                                                    <td className="py-2 text-right tabular-nums">
+                                                        {fill.quantity.toFixed(5)}
+                                                    </td>
+                                                    <td className="py-2 text-right">
+                                                        <span
+                                                            className={
+                                                                fill.pnl > 0
+                                                                    ? "text-green-500 font-medium"
+                                                                    : fill.pnl < 0
+                                                                      ? "text-destructive font-medium"
+                                                                      : "text-muted-foreground"
+                                                            }
+                                                        >
+                                                            {fill.pnl > 0 ? "+" : ""}
+                                                            {formatCurrency(fill.pnl)}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                                    Sin ejecuciones aún
                                 </div>
                             )}
                         </CardContent>
