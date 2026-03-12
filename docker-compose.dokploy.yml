@@ -97,6 +97,50 @@ services:
         condition: service_healthy
     restart: always
 
+  tradingbot-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scheduler
+      args:
+        APP_NAME: ${APP_NAME:-GridBot Trading}
+    volumes:
+      - app-storage:/var/www/html/storage
+    environment:
+      - CONTAINER_ROLE=scheduler
+      - APP_NAME=TradingBot
+      - APP_ENV=${APP_ENV-production}
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=${APP_DEBUG-false}
+      - APP_URL=${APP_URL-http://localhost}
+      - LOG_CHANNEL=stack
+      - LOG_STACK=single
+      - LOG_LEVEL=${LOG_LEVEL-warning}
+      - DB_CONNECTION=mysql
+      - DB_HOST=tradingbot-mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - QUEUE_CONNECTION=redis
+      - CACHE_STORE=redis
+      - REDIS_CLIENT=phpredis
+      - REDIS_HOST=tradingbot-redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - AI_URL=${AI_URL}
+      - AI_MODEL=${AI_MODEL}
+      - AI_API_KEY=${AI_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    networks:
+      - tradingbot-net
+    depends_on:
+      tradingbot-mysql:
+        condition: service_healthy
+      tradingbot-redis:
+        condition: service_healthy
+    restart: always
+
   tradingbot-mysql:
     image: mysql:8.0
     pull_policy: missing
