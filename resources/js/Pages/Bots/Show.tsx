@@ -1162,6 +1162,8 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? "",
                 },
                 body: JSON.stringify({
@@ -1169,7 +1171,16 @@ function AiPromptConfig({ bot }: { bot: Bot }) {
                     ai_user_prompt: userPrompt || null,
                 }),
             });
-            const data = await res.json();
+
+            const text = await res.text();
+            let data: any;
+            try {
+                data = JSON.parse(text);
+            } catch {
+                setReview(`Error: respuesta inesperada del servidor (HTTP ${res.status})`);
+                return;
+            }
+
             setReview(data.review || data.error || "Sin respuesta");
         } catch (e: any) {
             setReview("Error: " + e.message);
