@@ -293,6 +293,169 @@ Order statistics for a bot.
 
 ---
 
+### AI Agent
+
+#### `GET /api/v1/ai-agent/conversations`
+
+List recent AI agent conversations with summary, analysis, actions taken, and stats.
+
+**Query params:**
+| Param  | Description              | Default |
+|--------|--------------------------|---------|
+| bot_id | Filter by bot ID         | all     |
+| status | completed, error, running| all     |
+| limit  | 1–100                    | 20      |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 42,
+      "bot_id": 6,
+      "bot_name": "BTC Tight Grid",
+      "bot_symbol": "BTCUSDT",
+      "status": "completed",
+      "trigger": "scheduled",
+      "model": "gpt-4o",
+      "summary": "Bot is healthy, no action needed",
+      "analysis": "Price within grid range, 15 open orders...",
+      "actions_taken": ["grid_adjusted"],
+      "total_tokens": 1840,
+      "total_tool_calls": 3,
+      "total_messages": 8,
+      "duration_ms": 4520,
+      "action_logs": [
+        {
+          "action": "grid_adjusted",
+          "source": "agent",
+          "details": { "new_lower": 66000, "new_upper": 74000 }
+        }
+      ],
+      "started_at": "2026-03-12T10:00:00+00:00",
+      "ended_at": "2026-03-12T10:00:04+00:00"
+    }
+  ]
+}
+```
+
+---
+
+#### `GET /api/v1/ai-agent/conversations/{id}`
+
+Full conversation detail: every message, tool call (name, args, result), and action logs with before/after state.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 42,
+    "bot_id": 6,
+    "bot_name": "BTC Tight Grid",
+    "bot_symbol": "BTCUSDT",
+    "status": "completed",
+    "trigger": "scheduled",
+    "model": "gpt-4o",
+    "summary": "Bot is healthy, no action needed",
+    "analysis": "Price within grid range...",
+    "actions_taken": [],
+    "total_tokens": 1840,
+    "total_tool_calls": 3,
+    "duration_ms": 4520,
+    "started_at": "2026-03-12T10:00:00+00:00",
+    "ended_at": "2026-03-12T10:00:04+00:00",
+    "messages": [
+      {
+        "id": 100,
+        "role": "system",
+        "content": "You are a trading assistant...",
+        "tool_calls": null,
+        "tool_call_id": null,
+        "tool_name": null,
+        "tool_args": null,
+        "tool_result": null,
+        "tokens": 450,
+        "created_at": "2026-03-12T10:00:00+00:00"
+      },
+      {
+        "id": 102,
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [{ "id": "call_abc", "function": { "name": "get_bot_status", "arguments": "{}" } }],
+        "tool_call_id": null,
+        "tool_name": null,
+        "tool_args": null,
+        "tool_result": null,
+        "tokens": 120,
+        "created_at": "2026-03-12T10:00:01+00:00"
+      },
+      {
+        "id": 103,
+        "role": "tool",
+        "content": null,
+        "tool_calls": null,
+        "tool_call_id": "call_abc",
+        "tool_name": "get_bot_status",
+        "tool_args": {},
+        "tool_result": { "status": "active", "open_orders": 15, "pnl": 13.02 },
+        "tokens": 0,
+        "created_at": "2026-03-12T10:00:02+00:00"
+      }
+    ],
+    "action_logs": [
+      {
+        "id": 10,
+        "action": "grid_adjusted",
+        "source": "agent",
+        "details": { "new_lower": 66000, "new_upper": 74000 },
+        "before_state": { "price_lower": 67979, "price_upper": 75107 },
+        "after_state": { "price_lower": 66000, "price_upper": 74000 },
+        "created_at": "2026-03-12T10:00:03+00:00"
+      }
+    ]
+  }
+}
+```
+
+---
+
+#### `GET /api/v1/ai-agent/actions`
+
+List recent action logs executed by the AI agent across all bots.
+
+**Query params:**
+| Param  | Description      | Default |
+|--------|------------------|---------|
+| bot_id | Filter by bot ID | all     |
+| limit  | 1–100            | 30      |
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 10,
+      "bot_id": 6,
+      "bot_name": "BTC Tight Grid",
+      "bot_symbol": "BTCUSDT",
+      "conversation_id": 42,
+      "conversation_summary": "Bot healthy, adjusted grid range",
+      "action": "grid_adjusted",
+      "source": "agent",
+      "details": { "new_lower": 66000, "new_upper": 74000 },
+      "before_state": { "price_lower": 67979, "price_upper": 75107 },
+      "after_state": { "price_lower": 66000, "price_upper": 74000 },
+      "created_at": "2026-03-12T10:00:03+00:00"
+    }
+  ]
+}
+```
+
+---
+
 ## Error Responses
 
 | HTTP | Meaning                         |
@@ -348,6 +511,23 @@ curl -X PATCH \
   -H "Content-Type: application/json" \
   -d '{"price_lower": 65000, "price_upper": 78000, "grid_count": 20}' \
   "$HOST/api/v1/bots/1"
+
+# --- AI Agent ---
+
+# Last 20 AI conversations
+curl -H "X-API-Key: $KEY" "$HOST/api/v1/ai-agent/conversations"
+
+# Conversations for bot 6 only
+curl -H "X-API-Key: $KEY" "$HOST/api/v1/ai-agent/conversations?bot_id=6&limit=10"
+
+# Full conversation detail (messages + tool calls + action logs)
+curl -H "X-API-Key: $KEY" "$HOST/api/v1/ai-agent/conversations/42"
+
+# Recent AI actions across all bots
+curl -H "X-API-Key: $KEY" "$HOST/api/v1/ai-agent/actions"
+
+# AI actions for bot 6
+curl -H "X-API-Key: $KEY" "$HOST/api/v1/ai-agent/actions?bot_id=6"
 ```
 
 ---

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiAgentApiController;
 use App\Http\Controllers\Api\BotApiController;
 use App\Http\Controllers\Api\MarketApiController;
 use App\Http\Controllers\Api\OrderApiController;
@@ -47,5 +48,14 @@ Route::prefix('v1')->middleware('api.key')->group(function () {
         Route::get('/',              [OrderApiController::class, 'global']);  // all orders
         Route::get('/bot/{bot}',     [OrderApiController::class, 'byBot']);   // orders for bot
         Route::get('/bot/{bot}/stats', [OrderApiController::class, 'stats']); // stats for bot
+    });
+
+    // ------------------------------------------------------------------
+    // AI Agent — conversations, messages, tool calls & action logs
+    // ------------------------------------------------------------------
+    Route::prefix('ai-agent')->group(function () {
+        Route::get('/conversations',                [AiAgentApiController::class, 'conversations']); // ?bot_id=N&limit=20&status=completed
+        Route::get('/conversations/{conversation}', [AiAgentApiController::class, 'show']);           // full detail with messages & tool calls
+        Route::get('/actions',                      [AiAgentApiController::class, 'actions']);        // ?bot_id=N&limit=30
     });
 });
