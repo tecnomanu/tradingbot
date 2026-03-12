@@ -130,6 +130,7 @@ PROMPT;
 ## ACTION GATE — only act if one is true:
 - grid_position% > 85 or < 15 | price outside grid | RSI > 75 or < 25
 - Unrealized loss > 2% of investment | no SL set with open position
+- open_orders = 0 on an active bot → CRITICAL: use adjust_grid to recenter the grid around current price (same range width). A grid bot with 0 open orders is not trading.
 If none → do NOT call any action tool.
 
 ## RULES

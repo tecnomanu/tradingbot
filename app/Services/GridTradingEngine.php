@@ -157,6 +157,7 @@ class GridTradingEngine
         try {
             $this->syncOrderStatuses($bot);
             $this->handleFilledOrders($bot);
+            $this->autoRebuildIfEmpty($bot);
             $this->updateBotStats($bot);
             $this->checkStopConditions($bot);
         } catch (Exception $e) {
@@ -169,6 +170,55 @@ class GridTradingEngine
                 'status' => BotStatus::Error,
             ]);
         }
+    }
+
+    /**
+     * When an active bot has zero open orders (all filled or at grid edges),
+     * automatically rebuild the grid centered on the current price.
+     */
+    private function autoRebuildIfEmpty(Bot $bot): void
+    {
+        $openCount = $bot->orders()->where('status', OrderStatus::Open)->count();
+
+        if ($openCount > 0) {
+            return;
+        }
+
+        $hasFilled = $bot->orders()->where('status', OrderStatus::Filled)->exists();
+        if (!$hasFilled) {
+            return;
+        }
+
+        $account = $bot->binanceAccount;
+        $currentPrice = $this->binance->getCurrentPrice($account, $bot->symbol);
+
+        if (!$currentPrice) {
+            Log::warning('GridEngine: cannot auto-rebuild, no price', ['bot_id' => $bot->id]);
+            return;
+        }
+
+        Log::info('GridEngine: auto-rebuilding grid (0 open orders)', [
+            'bot_id' => $bot->id,
+            'current_price' => $currentPrice,
+            'old_range' => "{$bot->price_lower}-{$bot->price_upper}",
+        ]);
+
+        $range = ($bot->price_upper - $bot->price_lower);
+        $newLower = round($currentPrice - $range / 2, 2);
+        $newUpper = round($currentPrice + $range / 2, 2);
+
+        $this->botRepository->update($bot, [
+            'price_lower' => $newLower,
+            'price_upper' => $newUpper,
+        ]);
+
+        $bot->refresh();
+        $this->rebuildGrid($bot, $currentPrice);
+
+        Log::info('GridEngine: auto-rebuild complete', [
+            'bot_id' => $bot->id,
+            'new_range' => "{$newLower}-{$newUpper}",
+        ]);
     }
 
     /**
