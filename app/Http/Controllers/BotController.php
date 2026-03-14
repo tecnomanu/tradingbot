@@ -7,10 +7,12 @@ use App\Constants\GridConstants;
 use App\Enums\BotSide;
 use App\Enums\BotStatus;
 use App\Models\Bot;
+use App\Models\BotActionLog;
 use App\Repositories\BinanceAccountRepository;
 use App\Repositories\BotRepository;
 use App\Repositories\OrderRepository;
 use App\Services\BinanceApiService;
+use App\Services\BotActivityLogger;
 use App\Services\BotService;
 use App\Services\GridCalculatorService;
 use App\Services\PnlService;
@@ -128,6 +130,13 @@ class BotController extends Controller
 
         $bot = $this->botService->createBot($validated);
 
+        BotActivityLogger::logUserAction($bot, 'bot_created', $request->user(), [
+            'symbol' => $bot->symbol,
+            'side' => $bot->side->value,
+            'grid_count' => $bot->grid_count,
+            'investment' => (float) $bot->investment,
+        ]);
+
         return redirect()->route('bots.show', $bot->id)
             ->with('success', 'Bot creado exitosamente');
     }
@@ -197,6 +206,23 @@ class BotController extends Controller
             ])
             ->values();
 
+        $activityLogs = BotActionLog::where('bot_id', $bot->id)
+            ->with('user:id,name,email')
+            ->orderByDesc('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (BotActionLog $log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'source' => $log->source,
+                'actor_label' => $log->actor_label,
+                'details' => $log->details,
+                'before_state' => $log->before_state,
+                'after_state' => $log->after_state,
+                'created_at' => $log->created_at->toIso8601String(),
+                'created_at_fmt' => $log->created_at->format('d/m H:i:s'),
+            ]);
+
         return Inertia::render('Bots/Show', [
             'bot' => $summary['bot'],
             'orderStats' => $summary['order_stats'],
@@ -212,6 +238,7 @@ class BotController extends Controller
             ],
             'chartOrders' => $chartOrders,
             'recentFills' => $recentFills,
+            'activityLogs' => $activityLogs,
         ]);
     }
 
@@ -228,6 +255,8 @@ class BotController extends Controller
 
         $this->botService->startBot($bot);
 
+        BotActivityLogger::logUserAction($bot, 'bot_started', $request->user());
+
         return back()->with('success', 'Bot en proceso de inicialización. Las órdenes se colocarán en breve.');
     }
 
@@ -243,6 +272,8 @@ class BotController extends Controller
         }
 
         $this->botService->stopBot($bot);
+
+        BotActivityLogger::logUserAction($bot, 'bot_stopped', $request->user());
 
         return back()->with('success', 'Bot detenido. Todas las órdenes abiertas fueron canceladas.');
     }
@@ -391,6 +422,7 @@ class BotController extends Controller
 
         $validated['grid_mode'] = $validated['grid_mode'] ?? $bot->grid_mode ?? 'arithmetic';
         $wasActive = $bot->status === BotStatus::Active;
+        $beforeState = BotActivityLogger::captureState($bot);
 
         if ($wasActive) {
             $this->botService->stopBot($bot);
@@ -415,6 +447,11 @@ class BotController extends Controller
             'commission_per_grid' => $gridConfig['commission_per_grid'],
         ]));
 
+        BotActivityLogger::logUserAction($bot, 'bot_updated', $request->user(), [
+            'was_active' => $wasActive,
+            'fields_changed' => array_keys($validated),
+        ], $beforeState, BotActivityLogger::captureState($bot));
+
         if ($wasActive) {
             $this->botService->startBot($bot);
 
@@ -432,6 +469,11 @@ class BotController extends Controller
     public function destroy(Request $request, Bot $bot): RedirectResponse
     {
         $this->authorizeBot($request, $bot);
+
+        BotActivityLogger::logUserAction($bot, 'bot_deleted', $request->user(), [
+            'symbol' => $bot->symbol,
+            'name' => $bot->name,
+        ]);
 
         $this->botService->deleteBot($bot);
 

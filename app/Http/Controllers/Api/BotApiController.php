@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\BotStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Bot;
+use App\Services\BotActivityLogger;
 use App\Services\BotService;
 use App\Services\GridCalculatorService;
 use App\Services\PnlService;
@@ -88,6 +89,8 @@ class BotApiController extends Controller
 
         $this->botService->startBot($bot);
 
+        BotActivityLogger::logApiAction($bot, 'bot_started', $request->user());
+
         return $this->successResponse(
             ['bot_id' => $bot->id, 'status' => 'pending'],
             'Bot start dispatched. Orders will be placed on Binance shortly.'
@@ -107,6 +110,8 @@ class BotApiController extends Controller
 
         $this->botService->stopBot($bot);
         $bot->refresh();
+
+        BotActivityLogger::logApiAction($bot, 'bot_stopped', $request->user());
 
         return $this->successResponse(
             ['bot_id' => $bot->id, 'status' => $bot->status->value],
@@ -141,6 +146,8 @@ class BotApiController extends Controller
             return $this->errorResponse('No valid fields provided', 422);
         }
 
+        $beforeState = BotActivityLogger::captureState($bot);
+
         // Recalculate grid if price/grid params changed
         if (array_intersect_key($validated, array_flip(['price_lower', 'price_upper', 'grid_count', 'investment', 'leverage']))) {
             $gridConfig = $this->gridCalculator->calculateFullGridConfig([
@@ -161,6 +168,10 @@ class BotApiController extends Controller
         }
 
         $bot->update($validated);
+
+        BotActivityLogger::logApiAction($bot, 'bot_updated', $request->user(), [
+            'fields_changed' => array_keys($validated),
+        ], $beforeState, BotActivityLogger::captureState($bot->fresh()));
 
         return $this->successResponse($this->formatBotSummary($bot->fresh()), 'Bot updated');
     }

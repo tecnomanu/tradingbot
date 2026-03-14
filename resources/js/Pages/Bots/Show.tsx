@@ -42,17 +42,23 @@ import { Head, Link, router } from "@inertiajs/react";
 import {
     Activity,
     ArrowLeft,
+    Bot as BotIcon,
     Brain,
     CheckCircle,
     Clock,
     FlaskConical,
+    History,
     Loader2,
+    Monitor,
     Pencil,
     Play,
     RefreshCw,
     Save,
+    Server,
     Trash2,
+    User,
     XCircle,
+    Zap,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -84,6 +90,18 @@ interface ActivityInfo {
     rounds_24h: number;
 }
 
+interface ActivityLogEntry {
+    id: number;
+    action: string;
+    source: string;
+    actor_label: string;
+    details: Record<string, any> | null;
+    before_state: Record<string, any> | null;
+    after_state: Record<string, any> | null;
+    created_at: string;
+    created_at_fmt: string;
+}
+
 interface ShowProps {
     bot: Bot;
     orderStats: OrderStats;
@@ -94,6 +112,7 @@ interface ShowProps {
     position?: BinancePosition | null;
     activity: ActivityInfo;
     chartOrders?: ChartOrder[];
+    activityLogs?: ActivityLogEntry[];
 }
 
 function timeSince(dateStr: string | null): string {
@@ -117,6 +136,7 @@ export default function Show({
     position,
     activity,
     chartOrders = [],
+    activityLogs = [],
 }: ShowProps) {
     const isRunning = bot.status === "active";
     const roiPct = bot.real_investment
@@ -416,6 +436,15 @@ export default function Show({
                     <TabsTrigger value="ai" className="gap-1.5">
                         <Brain className="h-3.5 w-3.5" />
                         AI Agent
+                    </TabsTrigger>
+                    <TabsTrigger value="historial" className="gap-1.5">
+                        <History className="h-3.5 w-3.5" />
+                        Historial
+                        {activityLogs.length > 0 && (
+                            <Badge variant="secondary" className="ml-1 text-[10px]">
+                                {activityLogs.length}
+                            </Badge>
+                        )}
                     </TabsTrigger>
                 </TabsList>
 
@@ -1120,8 +1149,168 @@ export default function Show({
                 <TabsContent value="ai" className="space-y-4">
                     <AiPromptConfig bot={bot} />
                 </TabsContent>
+
+                <TabsContent value="historial" className="space-y-4">
+                    <BotActivityLog logs={activityLogs} />
+                </TabsContent>
             </Tabs>
         </AuthenticatedLayout>
+    );
+}
+
+const actionLabels: Record<string, string> = {
+    bot_created: "Bot creado",
+    bot_started: "Bot iniciado",
+    bot_stopped: "Bot detenido",
+    bot_updated: "Bot actualizado",
+    bot_deleted: "Bot eliminado",
+    order_placed: "Orden colocada",
+    order_cancelled: "Orden cancelada",
+    grid_adjusted: "Grid ajustado",
+    sl_set: "Stop Loss configurado",
+    tp_set: "Take Profit configurado",
+    leverage_changed: "Apalancamiento cambiado",
+    position_closed: "Posición cerrada",
+    orders_cancelled: "Órdenes canceladas",
+};
+
+const sourceConfig: Record<string, { icon: typeof User; color: string; bg: string }> = {
+    user: { icon: User, color: "text-blue-500", bg: "bg-blue-500/10" },
+    api: { icon: Zap, color: "text-amber-500", bg: "bg-amber-500/10" },
+    agent: { icon: Brain, color: "text-purple-500", bg: "bg-purple-500/10" },
+    system: { icon: Server, color: "text-gray-500", bg: "bg-gray-500/10" },
+    manual: { icon: Monitor, color: "text-cyan-500", bg: "bg-cyan-500/10" },
+};
+
+function formatLogDetails(details: Record<string, any> | null): string {
+    if (!details) return "";
+    const parts: string[] = [];
+    if (details.symbol) parts.push(details.symbol);
+    if (details.fields_changed) parts.push(`Campos: ${details.fields_changed.join(", ")}`);
+    if (details.was_active) parts.push("Estaba activo → reiniciado");
+    if (details.side) parts.push(`Lado: ${details.side}`);
+    if (details.grid_count) parts.push(`Grids: ${details.grid_count}`);
+    if (details.investment) parts.push(`Inversión: ${details.investment} USDT`);
+    if (details.new_lower !== undefined) parts.push(`Rango: ${details.new_lower} - ${details.new_upper}`);
+    if (details.stop_loss_price !== undefined) parts.push(`SL: ${details.stop_loss_price}`);
+    if (details.take_profit_price !== undefined) parts.push(`TP: ${details.take_profit_price}`);
+    if (details.reason) parts.push(details.reason);
+    if (parts.length === 0 && Object.keys(details).length > 0) {
+        return Object.entries(details)
+            .filter(([, v]) => v !== null && v !== undefined)
+            .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`)
+            .join(", ");
+    }
+    return parts.join(" · ");
+}
+
+function BotActivityLog({ logs }: { logs: ActivityLogEntry[] }) {
+    if (logs.length === 0) {
+        return (
+            <Card>
+                <CardContent className="flex h-40 items-center justify-center">
+                    <div className="text-center text-sm text-muted-foreground">
+                        <History className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                        <p>Sin actividad registrada aún</p>
+                        <p className="text-xs mt-1">Las acciones sobre el bot aparecerán aquí</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card>
+            <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                    <History className="h-4 w-4" />
+                    Log de Actividad
+                    <Badge variant="secondary" className="text-[10px]">
+                        {logs.length} eventos
+                    </Badge>
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="max-h-[600px] overflow-y-auto">
+                    <div className="relative">
+                        <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
+                        <div className="space-y-0">
+                            {logs.map((log) => {
+                                const cfg = sourceConfig[log.source] ?? sourceConfig.system;
+                                const Icon = cfg.icon;
+                                const detailStr = formatLogDetails(log.details);
+
+                                return (
+                                    <div key={log.id} className="relative flex gap-3 py-2.5 pl-0 group">
+                                        <div className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${cfg.bg} ring-4 ring-background`}>
+                                            <Icon className={`h-4 w-4 ${cfg.color}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0 pt-0.5">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-sm font-medium">
+                                                    {actionLabels[log.action] ?? log.action}
+                                                </span>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`text-[10px] ${cfg.color} border-current/20`}
+                                                >
+                                                    {log.actor_label}
+                                                </Badge>
+                                                <span className="text-[11px] text-muted-foreground ml-auto tabular-nums shrink-0">
+                                                    {log.created_at_fmt}
+                                                </span>
+                                            </div>
+                                            {detailStr && (
+                                                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                                    {detailStr}
+                                                </p>
+                                            )}
+                                            {log.before_state && log.after_state && (
+                                                <StateChanges before={log.before_state} after={log.after_state} />
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function StateChanges({ before, after }: { before: Record<string, any>; after: Record<string, any> }) {
+    const changes = Object.keys(after).filter(
+        (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key])
+    );
+    if (changes.length === 0) return null;
+
+    const fieldLabels: Record<string, string> = {
+        status: "Estado",
+        price_lower: "Precio inferior",
+        price_upper: "Precio superior",
+        grid_count: "Rejillas",
+        investment: "Inversión",
+        leverage: "Apalancamiento",
+        stop_loss_price: "Stop Loss",
+        take_profit_price: "Take Profit",
+        grid_mode: "Modo grid",
+    };
+
+    return (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {changes.map((key) => (
+                <span
+                    key={key}
+                    className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono"
+                >
+                    <span className="text-muted-foreground">{fieldLabels[key] ?? key}:</span>
+                    <span className="text-red-400 line-through">{String(before[key] ?? "—")}</span>
+                    <span className="text-green-400">{String(after[key] ?? "—")}</span>
+                </span>
+            ))}
+        </div>
     );
 }
 

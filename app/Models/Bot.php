@@ -94,6 +94,11 @@ class Bot extends Model
         return $this->hasMany(BotPnlSnapshot::class);
     }
 
+    public function actionLogs(): HasMany
+    {
+        return $this->hasMany(BotActionLog::class);
+    }
+
     // Scopes
     public function scopeActive($query)
     {
