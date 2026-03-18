@@ -6,6 +6,8 @@ use App\Constants\BinanceConstants;
 use App\Constants\GridConstants;
 use App\Enums\BotSide;
 use App\Enums\BotStatus;
+use App\Http\Requests\StoreBotRequest;
+use App\Http\Requests\UpdateBotRequest;
 use App\Models\Bot;
 use App\Models\BotActionLog;
 use App\Repositories\BinanceAccountRepository;
@@ -107,24 +109,9 @@ class BotController extends Controller
     /**
      * Store a new bot.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreBotRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'binance_account_id' => 'required|exists:binance_accounts,id',
-            'name' => 'required|string|max:255',
-            'symbol' => 'required|string|in:' . implode(',', BinanceConstants::SUPPORTED_PAIRS),
-            'side' => 'required|string|in:' . implode(',', array_column(BotSide::cases(), 'value')),
-            'price_lower' => 'required|numeric|min:0',
-            'price_upper' => 'required|numeric|gt:price_lower',
-            'grid_count' => 'required|integer|min:' . GridConstants::MIN_GRIDS . '|max:' . GridConstants::MAX_GRIDS,
-            'investment' => 'required|numeric|min:' . GridConstants::MIN_INVESTMENT,
-            'leverage' => 'required|integer|min:' . GridConstants::MIN_LEVERAGE . '|max:' . GridConstants::MAX_LEVERAGE,
-            'slippage' => 'nullable|numeric|min:0|max:5',
-            'stop_loss_price' => 'nullable|numeric|min:0',
-            'take_profit_price' => 'nullable|numeric|min:0',
-            'grid_mode' => 'nullable|string|in:arithmetic,geometric',
-        ]);
-
+        $validated = $request->validated();
         $validated['grid_mode'] = $validated['grid_mode'] ?? 'arithmetic';
         $validated['user_id'] = $request->user()->id;
 
@@ -403,22 +390,11 @@ class BotController extends Controller
      * Update bot configuration. If bot is active, it will be stopped,
      * reconfigured and restarted automatically.
      */
-    public function update(Request $request, Bot $bot): RedirectResponse
+    public function update(UpdateBotRequest $request, Bot $bot): RedirectResponse
     {
         $this->authorizeBot($request, $bot);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'price_lower' => 'required|numeric|min:0',
-            'price_upper' => 'required|numeric|gt:price_lower',
-            'grid_count' => 'required|integer|min:' . GridConstants::MIN_GRIDS . '|max:' . GridConstants::MAX_GRIDS,
-            'investment' => 'required|numeric|min:' . GridConstants::MIN_INVESTMENT,
-            'leverage' => 'required|integer|min:' . GridConstants::MIN_LEVERAGE . '|max:' . GridConstants::MAX_LEVERAGE,
-            'slippage' => 'nullable|numeric|min:0|max:5',
-            'stop_loss_price' => 'nullable|numeric|min:0',
-            'take_profit_price' => 'nullable|numeric|min:0',
-            'grid_mode' => 'nullable|string|in:arithmetic,geometric',
-        ]);
+        $validated = $request->validated();
 
         $validated['grid_mode'] = $validated['grid_mode'] ?? $bot->grid_mode ?? 'arithmetic';
         $wasActive = $bot->status === BotStatus::Active;

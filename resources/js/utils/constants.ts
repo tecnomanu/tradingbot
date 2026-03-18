@@ -32,6 +32,12 @@ export const NAV_ITEMS = [
     },
 ] as const;
 
+export const REFRESH_INTERVAL_MS = 30_000;
+export const RECENT_ACTIVITY_THRESHOLD_MS = 300_000;
+export const MAINTENANCE_MARGIN_RATE = 0.004;
+export const BINANCE_WS_URL = "wss://stream.binance.com:9443";
+export const ORDER_BOOK_DEPTH = 14;
+
 export const ORDER_NAV_ITEMS = [
     {
         label: "Posiciones",

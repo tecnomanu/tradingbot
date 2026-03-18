@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\AgentTrigger;
 use App\Enums\BotStatus;
 use App\Models\Bot;
 use App\Services\Agent\AgentOrchestrator;
@@ -31,13 +32,13 @@ class RunAgentAlertJob implements ShouldQueue, ShouldBeUnique
 
     public function __construct(
         private Bot $bot,
-        private string $trigger,
+        private AgentTrigger $trigger,
         private string $alertContext,
     ) {}
 
     public function uniqueId(): string
     {
-        return "agent_alert_{$this->bot->id}_{$this->trigger}";
+        return "agent_alert_{$this->bot->id}_{$this->trigger->value}";
     }
 
     public function handle(AgentOrchestrator $orchestrator): void
@@ -47,21 +48,21 @@ class RunAgentAlertJob implements ShouldQueue, ShouldBeUnique
         if ($this->bot->status !== BotStatus::Active) {
             Log::info('RunAgentAlertJob: bot not active, skipping', [
                 'bot_id' => $this->bot->id,
-                'trigger' => $this->trigger,
-            ]);
+            'trigger' => $this->trigger->value,
+        ]);
             return;
         }
 
         Log::info('RunAgentAlertJob: starting alert consultation', [
             'bot_id' => $this->bot->id,
-            'trigger' => $this->trigger,
+            'trigger' => $this->trigger->value,
         ]);
 
         $conversation = $orchestrator->consult($this->bot, $this->trigger, $this->alertContext);
 
         Log::info('RunAgentAlertJob: alert consultation complete', [
             'bot_id' => $this->bot->id,
-            'trigger' => $this->trigger,
+            'trigger' => $this->trigger->value,
             'conversation_id' => $conversation->id,
             'status' => $conversation->status,
             'tools_used' => $conversation->total_tool_calls,
@@ -70,6 +71,6 @@ class RunAgentAlertJob implements ShouldQueue, ShouldBeUnique
 
     public function tags(): array
     {
-        return ['bot:' . $this->bot->id, 'agent-alert', $this->trigger];
+        return ['bot:' . $this->bot->id, 'agent-alert', $this->trigger->value];
     }
 }

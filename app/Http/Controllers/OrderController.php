@@ -26,7 +26,7 @@ class OrderController extends Controller
         )->orderByDesc('started_at')->get();
 
         $stoppedBots = $withCounts(
-            Bot::where('user_id', $userId)->whereIn('status', ['stopped', 'error', 'completed'])
+            Bot::where('user_id', $userId)->whereIn('status', ['stopped', 'error'])
         )->orderByDesc('updated_at')->get();
 
         return Inertia::render('Orders/Bots', [
@@ -106,7 +106,7 @@ class OrderController extends Controller
                 return [
                     'id' => $bot->id,
                     'symbol' => $bot->symbol,
-                    'side' => $bot->side,
+                    'side' => $bot->side->value,
                     'leverage' => $bot->leverage,
                     'investment' => $bot->real_investment,
                     'pnl' => $bot->total_pnl,

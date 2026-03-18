@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\OrderResource;
 use App\Models\Bot;
 use App\Models\Order;
 use App\Traits\ApiResponse;
@@ -41,7 +42,7 @@ class OrderApiController extends Controller
             'bot_id'  => $bot->id,
             'filters' => ['status' => $status, 'side' => $side, 'limit' => $limit],
             'total'   => $orders->count(),
-            'orders'  => $this->formatOrders($orders),
+            'orders'  => OrderResource::collection($orders),
         ]);
     }
 
@@ -84,10 +85,7 @@ class OrderApiController extends Controller
                 'total_pnl_usdt' => round((float) $allOrders->total_pnl, 4),
             ],
             'filters' => ['status' => $status, 'limit' => $limit],
-            'orders'  => $orders->map(fn ($o) => array_merge(
-                $this->formatOrder($o),
-                ['bot' => ['id' => $o->bot?->id, 'name' => $o->bot?->name, 'symbol' => $o->bot?->symbol]]
-            ))->values()->all(),
+            'orders'  => OrderResource::collection($orders),
         ]);
     }
 
@@ -138,28 +136,4 @@ class OrderApiController extends Controller
         ]);
     }
 
-    // -------------------------------------------------------------------------
-    // Internal formatters
-    // -------------------------------------------------------------------------
-
-    private function formatOrders(\Illuminate\Support\Collection $orders): array
-    {
-        return $orders->map(fn ($o) => $this->formatOrder($o))->values()->all();
-    }
-
-    private function formatOrder(Order $o): array
-    {
-        return [
-            'id'               => $o->id,
-            'side'             => $o->side->value,
-            'status'           => $o->status->value,
-            'price'            => (float) $o->price,
-            'quantity'         => (float) $o->quantity,
-            'grid_level'       => $o->grid_level,
-            'pnl'              => (float) $o->pnl,
-            'binance_order_id' => $o->binance_order_id,
-            'filled_at'        => $o->filled_at?->toIso8601String(),
-            'created_at'       => $o->created_at?->toIso8601String(),
-        ];
-    }
 }

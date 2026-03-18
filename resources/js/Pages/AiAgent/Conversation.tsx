@@ -57,14 +57,7 @@ interface ConversationData {
     action_logs: ActionLog[];
 }
 
-const actionLabels: Record<string, string> = {
-    sl_set: "Stop-Loss configurado",
-    tp_set: "Take-Profit configurado",
-    bot_stopped: "Bot detenido",
-    orders_cancelled: "Órdenes canceladas",
-    position_closed: "Posición cerrada",
-    grid_adjusted: "Grid ajustado",
-};
+import { actionLabels, getActionLabel } from "@/utils/activityLabels";
 
 function formatArgsCompact(args: Record<string, any>): string {
     if (!args || Object.keys(args).length === 0) return "";

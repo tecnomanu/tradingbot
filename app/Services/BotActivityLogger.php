@@ -2,21 +2,17 @@
 
 namespace App\Services;
 
+use App\Enums\ActionSource;
 use App\Models\Bot;
 use App\Models\BotActionLog;
 use App\Models\User;
 
 class BotActivityLogger
 {
-    /**
-     * Log a bot activity from any source.
-     *
-     * @param  string  $source  user|api|agent|system
-     */
     public static function log(
         Bot $bot,
         string $action,
-        string $source,
+        ActionSource $source,
         ?User $user = null,
         array $details = [],
         ?array $beforeState = null,
@@ -28,7 +24,7 @@ class BotActivityLogger
             'user_id' => $user?->id,
             'conversation_id' => $conversationId,
             'action' => $action,
-            'source' => $source,
+            'source' => $source->value,
             'details' => $details ?: null,
             'before_state' => $beforeState,
             'after_state' => $afterState,
@@ -37,22 +33,22 @@ class BotActivityLogger
 
     public static function logUserAction(Bot $bot, string $action, User $user, array $details = [], ?array $beforeState = null, ?array $afterState = null): BotActionLog
     {
-        return self::log($bot, $action, 'user', $user, $details, $beforeState, $afterState);
+        return self::log($bot, $action, ActionSource::User, $user, $details, $beforeState, $afterState);
     }
 
     public static function logApiAction(Bot $bot, string $action, User $user, array $details = [], ?array $beforeState = null, ?array $afterState = null): BotActionLog
     {
-        return self::log($bot, $action, 'api', $user, $details, $beforeState, $afterState);
+        return self::log($bot, $action, ActionSource::Api, $user, $details, $beforeState, $afterState);
     }
 
     public static function logAgentAction(Bot $bot, string $action, array $details = [], ?int $conversationId = null): BotActionLog
     {
-        return self::log($bot, $action, 'agent', null, $details, null, null, $conversationId);
+        return self::log($bot, $action, ActionSource::Agent, null, $details, null, null, $conversationId);
     }
 
     public static function logSystemAction(Bot $bot, string $action, array $details = []): BotActionLog
     {
-        return self::log($bot, $action, 'system', null, $details);
+        return self::log($bot, $action, ActionSource::System, null, $details);
     }
 
     public static function captureState(Bot $bot): array

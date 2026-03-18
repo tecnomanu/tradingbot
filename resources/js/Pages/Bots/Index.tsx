@@ -4,6 +4,7 @@ import {
     ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { useBalance } from "@/hooks/useBalance";
 import { BinanceAccount, Bot, GridConfig } from "@/types/bot";
 import { Head, useForm } from "@inertiajs/react";
 import { Link } from "@inertiajs/react";
@@ -66,8 +67,6 @@ export default function Index({
     const [calculating, setCalculating] = useState(false);
     const [currentPrice, setCurrentPrice] = useState<number | null>(null);
     const [gridConfig, setGridConfig] = useState<GridConfig | null>(null);
-    const [balance, setBalance] = useState<number | null>(null);
-    const [fetchingBalance, setFetchingBalance] = useState(false);
     const [showGridLines, setShowGridLines] = useState(true);
     const [botMode, setBotMode] = useState<"futures" | "spot">("futures");
 
@@ -89,6 +88,8 @@ export default function Index({
         take_profit_price: editBot?.take_profit_price ?? "",
         grid_mode: editBot?.grid_mode ?? "arithmetic",
     });
+
+    const { balance, loading: fetchingBalance } = useBalance(data.binance_account_id);
 
     // Chart always uses form data so the user sees grid changes in real-time.
     // Orders come from the active bot regardless.
@@ -117,28 +118,6 @@ export default function Index({
         if (botMode === "spot") setData("leverage", "1");
     }, [botMode]);
 
-    useEffect(() => {
-        if (!data.binance_account_id) {
-            setBalance(null);
-            return;
-        }
-        const fetchBalance = async () => {
-            setFetchingBalance(true);
-            try {
-                const res = await axios.get(
-                    `/binance-accounts/${data.binance_account_id}/balance`,
-                );
-                setBalance(
-                    res.data.data?.total_usdt ?? res.data?.total_usdt ?? 0,
-                );
-            } catch {
-                setBalance(0);
-            } finally {
-                setFetchingBalance(false);
-            }
-        };
-        fetchBalance();
-    }, [data.binance_account_id]);
 
     const calculateParams = async () => {
         setCalculating(true);

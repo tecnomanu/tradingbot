@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\AgentTrigger;
 use App\Enums\BotStatus;
 use App\Models\Bot;
 use App\Models\BotActionLog;
@@ -59,7 +60,7 @@ class TestSlTpAlertCommand extends Command
 
         $start = microtime(true);
 
-        $conversation = $orchestrator->consult($bot, 'sl_tp_alert', $alertContext);
+        $conversation = $orchestrator->consult($bot, AgentTrigger::SlTpAlert, $alertContext);
 
         $elapsed = round((microtime(true) - $start) * 1000);
 

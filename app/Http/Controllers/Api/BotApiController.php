@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\BotStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateBotRequest;
+use App\Http\Resources\BotSummaryResource;
+use App\Http\Resources\OrderResource;
 use App\Models\Bot;
 use App\Services\BotActivityLogger;
 use App\Services\BotService;
@@ -68,9 +71,9 @@ class BotApiController extends Controller
             'bot'         => $this->formatBotSummary($bot),
             'config'      => $this->formatGridConfig($gridConfig),
             'orders'      => [
-                'open'    => $this->formatOrders($ordersByStatus->get('open', collect())),
-                'filled'  => $this->formatOrders($ordersByStatus->get('filled', collect())),
-                'cancelled' => $this->formatOrders($ordersByStatus->get('cancelled', collect())),
+                'open'      => OrderResource::collection($ordersByStatus->get('open', collect())),
+                'filled'    => OrderResource::collection($ordersByStatus->get('filled', collect())),
+                'cancelled' => OrderResource::collection($ordersByStatus->get('cancelled', collect())),
             ],
             'pnl_history' => $pnlHistory,
         ]);
@@ -122,7 +125,7 @@ class BotApiController extends Controller
     /**
      * Update bot config (only when stopped).
      */
-    public function update(Request $request, Bot $bot): JsonResponse
+    public function update(UpdateBotRequest $request, Bot $bot): JsonResponse
     {
         abort_if($bot->user_id !== $request->user()->id, 403, 'Forbidden');
 
@@ -130,17 +133,7 @@ class BotApiController extends Controller
             return $this->errorResponse('Cannot update an active bot. Stop it first.', 409);
         }
 
-        $validated = $request->validate([
-            'name'             => 'sometimes|string|max:255',
-            'price_lower'      => 'sometimes|numeric|min:0',
-            'price_upper'      => 'sometimes|numeric|gt:price_lower',
-            'grid_count'       => 'sometimes|integer|min:2|max:500',
-            'investment'       => 'sometimes|numeric|min:10',
-            'leverage'         => 'sometimes|integer|min:1|max:125',
-            'slippage'         => 'nullable|numeric|min:0|max:5',
-            'stop_loss_price'  => 'nullable|numeric|min:0',
-            'take_profit_price' => 'nullable|numeric|min:0',
-        ]);
+        $validated = $request->validated();
 
         if (count($validated) === 0) {
             return $this->errorResponse('No valid fields provided', 422);
@@ -224,21 +217,5 @@ class BotApiController extends Controller
             'additional_margin' => $config['additional_margin'] ?? null,
             'profit_per_grid'   => $config['profit_per_grid'] ?? null,
         ];
-    }
-
-    private function formatOrders(\Illuminate\Support\Collection $orders): array
-    {
-        return $orders->map(fn ($o) => [
-            'id'              => $o->id,
-            'side'            => $o->side->value,
-            'status'          => $o->status->value,
-            'price'           => (float) $o->price,
-            'quantity'        => (float) $o->quantity,
-            'grid_level'      => $o->grid_level,
-            'pnl'             => (float) $o->pnl,
-            'binance_order_id'=> $o->binance_order_id,
-            'filled_at'       => $o->filled_at?->toIso8601String(),
-            'created_at'      => $o->created_at?->toIso8601String(),
-        ])->values()->all();
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreBinanceAccountRequest;
+use App\Http\Requests\UpdateBinanceAccountRequest;
 use App\Models\BinanceAccount;
 use App\Repositories\BinanceAccountRepository;
 use App\Services\BinanceApiService;
@@ -45,15 +47,9 @@ class BinanceAccountController extends Controller
     /**
      * Store a new Binance account.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreBinanceAccountRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'label' => 'required|string|max:255',
-            'api_key' => 'required|string|min:10',
-            'api_secret' => 'required|string|min:10',
-            'is_testnet' => 'boolean',
-        ]);
-
+        $validated = $request->validated();
         $validated['user_id'] = $request->user()->id;
 
         $this->repository->create($validated);
@@ -64,17 +60,11 @@ class BinanceAccountController extends Controller
     /**
      * Update a Binance account.
      */
-    public function update(Request $request, BinanceAccount $binanceAccount): RedirectResponse
+    public function update(UpdateBinanceAccountRequest $request, BinanceAccount $binanceAccount): RedirectResponse
     {
         abort_if($binanceAccount->user_id !== $request->user()->id, 403);
 
-        $validated = $request->validate([
-            'label' => 'sometimes|string|max:255',
-            'api_key' => 'sometimes|string|min:10',
-            'api_secret' => 'sometimes|string|min:10',
-            'is_testnet' => 'sometimes|boolean',
-            'is_active' => 'sometimes|boolean',
-        ]);
+        $validated = $request->validated();
 
         $this->repository->update($binanceAccount, $validated);
 

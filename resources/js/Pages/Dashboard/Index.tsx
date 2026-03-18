@@ -3,7 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Bot, BotPnlSnapshot, DashboardStats } from "@/types/bot";
+import { ExtendedStats, RecentOrder, RecentAction } from "@/types/dashboard";
 import { formatCurrency } from "@/utils/formatters";
+import { timeSinceCompact } from "@/utils/timeago";
+import { actionLabels, actionColors, sourceConfig, getActionLabel, getActionColor } from "@/utils/activityLabels";
+import { REFRESH_INTERVAL_MS } from "@/utils/constants";
 import { Head, Link, router } from "@inertiajs/react";
 import { useEffect } from "react";
 import {
@@ -12,14 +16,10 @@ import {
     Bot as BotIcon,
     Brain,
     Grid3x3,
-    Monitor,
     Plus,
-    Server,
     ShoppingCart,
     TrendingUp,
-    User,
     Wallet,
-    Zap,
 } from "lucide-react";
 import {
     Area,
@@ -31,78 +31,6 @@ import {
     YAxis,
 } from "recharts";
 
-interface ExtendedStats {
-    total_orders: number;
-    open_orders: number;
-    filled_orders: number;
-    filled_24h: number;
-    rounds_24h: number;
-    accounts_total: number;
-    accounts_active: number;
-    accounts_testnet: number;
-    ai_conversations: number;
-    ai_actions: number;
-    last_ai_consult: string | null;
-    total_bots_stopped: number;
-    total_bots_error: number;
-    trend_pnl: number;
-}
-
-interface RecentOrder {
-    id: number;
-    symbol: string;
-    side: string;
-    price: number;
-    quantity: number;
-    pnl: number;
-    filled_at: string;
-}
-
-interface RecentAction {
-    id: number;
-    symbol: string;
-    action: string;
-    source: string;
-    actor_label: string;
-    created_at: string;
-}
-
-const actionLabels: Record<string, string> = {
-    bot_created: "Bot creado",
-    bot_started: "Bot iniciado",
-    bot_stopped: "Bot detenido",
-    bot_sl_tp_alert: "Alerta SL/TP",
-    bot_stop_blocked: "Stop bloqueado",
-    bot_updated: "Bot actualizado",
-    sl_set: "Stop-Loss",
-    tp_set: "Take-Profit",
-    orders_cancelled: "Órdenes canceladas",
-    position_closed: "Posición cerrada",
-    grid_adjusted: "Grid ajustado",
-    leverage_changed: "Apalancamiento",
-};
-
-const actionColors: Record<string, string> = {
-    bot_started: "text-emerald-500",
-    bot_stopped: "text-red-500",
-    bot_sl_tp_alert: "text-orange-500",
-    bot_stop_blocked: "text-amber-500",
-    bot_updated: "text-sky-400",
-    sl_set: "text-yellow-500",
-    tp_set: "text-emerald-500",
-    orders_cancelled: "text-orange-500",
-    position_closed: "text-red-400",
-    grid_adjusted: "text-blue-400",
-};
-
-const sourceConfig: Record<string, { icon: typeof User; color: string }> = {
-    user:   { icon: User,    color: "text-blue-500"   },
-    api:    { icon: Zap,     color: "text-amber-500"  },
-    agent:  { icon: Brain,   color: "text-purple-500" },
-    system: { icon: Server,  color: "text-gray-400"   },
-    manual: { icon: Monitor, color: "text-cyan-500"   },
-};
-
 interface DashboardProps {
     stats: DashboardStats;
     activeBots: Bot[];
@@ -110,17 +38,6 @@ interface DashboardProps {
     extended: ExtendedStats;
     recentOrders: RecentOrder[];
     recentActions: RecentAction[];
-}
-
-function timeSince(dateStr: string | null): string {
-    if (!dateStr) return "Nunca";
-    const ms = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(ms / 60000);
-    if (mins < 1) return "Ahora";
-    if (mins < 60) return `${mins}m`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h`;
-    return `${Math.floor(hrs / 24)}d`;
 }
 
 function MiniStat({
@@ -191,7 +108,7 @@ export default function Index({
         if (activeBots.length === 0) return;
         const interval = setInterval(() => {
             router.reload({ only: ["stats", "activeBots", "pnlChart", "extended", "recentOrders", "recentActions"] });
-        }, 30000);
+        }, REFRESH_INTERVAL_MS);
         return () => clearInterval(interval);
     }, [activeBots.length]);
 
@@ -272,7 +189,7 @@ export default function Index({
                     <MiniStat
                         label="AI Agent"
                         value={`${extended.ai_conversations}`}
-                        sub={`consultas · ${extended.ai_actions} acciones · ${timeSince(extended.last_ai_consult)} ago`}
+                        sub={`consultas · ${extended.ai_actions} acciones · ${timeSinceCompact(extended.last_ai_consult)} ago`}
                         icon={Brain}
                         color="text-purple-500"
                         href="/ai-agent"
@@ -378,7 +295,7 @@ export default function Index({
                                                 <span className={`font-medium tabular-nums ${order.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                                                     {order.pnl > 0 ? "+" : ""}{formatCurrency(order.pnl)}
                                                 </span>
-                                                <span className="text-muted-foreground">{timeSince(order.filled_at)}</span>
+                                                <span className="text-muted-foreground">{timeSinceCompact(order.filled_at)}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -475,7 +392,7 @@ export default function Index({
                                                         {action.actor_label ?? action.source}
                                                     </Badge>
                                                 </div>
-                                                <span className="text-muted-foreground shrink-0 ml-1">{timeSince(action.created_at)}</span>
+                                                <span className="text-muted-foreground shrink-0 ml-1">{timeSinceCompact(action.created_at)}</span>
                                             </div>
                                         );
                                     })}

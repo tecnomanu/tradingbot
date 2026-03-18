@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\AgentTrigger;
 use App\Enums\BotStatus;
 use App\Models\AiConversation;
 use App\Models\Bot;
@@ -40,7 +41,7 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 
                 Log::info('RunAgentConsultationJob: consulting agent for bot', ['bot_id' => $bot->id]);
 
-                $conversation = $orchestrator->consult($bot, 'scheduled');
+                $conversation = $orchestrator->consult($bot, AgentTrigger::Scheduled);
 
                 Log::info('RunAgentConsultationJob: consultation complete', [
                     'bot_id' => $bot->id,

@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
+import { sideLabel } from "@/utils/formatters";
 
+export { sideLabel };
 export type BadgeSize = "xs" | "sm" | "md";
 
 const SIZE_CLASSES: Record<BadgeSize, string> = {
@@ -20,17 +22,6 @@ export function sideColor(side: string) {
             return { bg: "bg-red-500/15", text: "text-red-500" };
         default:
             return { bg: "bg-yellow-500/15", text: "text-yellow-500" };
-    }
-}
-
-export function sideLabel(side: string) {
-    switch (side) {
-        case "long":
-            return "Long";
-        case "short":
-            return "Short";
-        default:
-            return "Neutral";
     }
 }
 

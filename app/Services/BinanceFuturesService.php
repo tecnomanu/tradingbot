@@ -212,7 +212,7 @@ class BinanceFuturesService
 
         $params = [
             'symbol' => $symbol,
-            'side' => $side === 'BUY' ? Side::BUY : Side::SELL,
+            'side' => $side === BinanceConstants::SIDE_BUY ? Side::BUY : Side::SELL,
             'type' => 'LIMIT',
             'timeInForce' => 'GTC',
             'quantity' => $quantity,
@@ -244,7 +244,7 @@ class BinanceFuturesService
 
         $request = new NewOrderRequest([
             'symbol' => $symbol,
-            'side' => $side === 'BUY' ? Side::BUY : Side::SELL,
+            'side' => $side === BinanceConstants::SIDE_BUY ? Side::BUY : Side::SELL,
             'type' => 'MARKET',
             'quantity' => $quantity,
         ]);
@@ -410,54 +410,13 @@ class BinanceFuturesService
      */
     public function formatQuantity(string $symbol, float $quantity): float
     {
-        $precisions = [
-            'BTCUSDT' => 3,
-            'ETHUSDT' => 3,
-            'BNBUSDT' => 2,
-            'SOLUSDT' => 1,
-            'DOGEUSDT' => 0,
-            'XRPUSDT' => 1,
-            'ADAUSDT' => 0,
-            'AVAXUSDT' => 1,
-            'DOTUSDT' => 1,
-            'MATICUSDT' => 0,
-            'LINKUSDT' => 1,
-            'UNIUSDT' => 1,
-            'LTCUSDT' => 2,
-            'ATOMUSDT' => 1,
-            'NEARUSDT' => 1,
-        ];
-
-        $decimals = $precisions[$symbol] ?? 3;
-
+        $decimals = BinanceConstants::QUANTITY_PRECISION[$symbol] ?? 3;
         return round($quantity, $decimals);
     }
 
-    /**
-     * Format price to Binance precision rules.
-     */
     public function formatPrice(string $symbol, float $price): float
     {
-        $precisions = [
-            'BTCUSDT' => 1,
-            'ETHUSDT' => 2,
-            'BNBUSDT' => 2,
-            'SOLUSDT' => 2,
-            'DOGEUSDT' => 5,
-            'XRPUSDT' => 4,
-            'ADAUSDT' => 5,
-            'AVAXUSDT' => 2,
-            'DOTUSDT' => 3,
-            'MATICUSDT' => 5,
-            'LINKUSDT' => 3,
-            'UNIUSDT' => 3,
-            'LTCUSDT' => 2,
-            'ATOMUSDT' => 3,
-            'NEARUSDT' => 3,
-        ];
-
-        $decimals = $precisions[$symbol] ?? 2;
-
+        $decimals = BinanceConstants::PRICE_PRECISION[$symbol] ?? 2;
         return round($price, $decimals);
     }
 }

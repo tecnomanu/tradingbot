@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ActionSource;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -35,12 +36,16 @@ class BotActionLog extends Model
 
     public function getActorLabelAttribute(): string
     {
-        return match ($this->source) {
-            'user' => $this->user?->name ?? 'Usuario',
-            'api' => 'API' . ($this->user ? " ({$this->user->name})" : ''),
-            'agent' => 'Agente AI',
-            'system' => 'Sistema',
-            default => ucfirst($this->source),
+        $source = ActionSource::tryFrom($this->source);
+
+        if (!$source) {
+            return ucfirst($this->source);
+        }
+
+        return match ($source) {
+            ActionSource::User => $this->user?->name ?? $source->label(),
+            ActionSource::Api => $source->label() . ($this->user ? " ({$this->user->name})" : ''),
+            default => $source->label(),
         };
     }
 }

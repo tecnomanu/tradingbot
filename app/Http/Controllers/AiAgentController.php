@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AgentTrigger;
 use App\Models\AiConversation;
 use App\Models\Bot;
 use App\Models\BotActionLog;
@@ -87,7 +88,7 @@ class AiAgentController extends Controller
             ->firstOrFail();
 
         $orchestrator = app(AgentOrchestrator::class);
-        $conversation = $orchestrator->consult($bot, 'manual');
+        $conversation = $orchestrator->consult($bot, AgentTrigger::Manual);
 
         if ($conversation->status === 'completed') {
             return redirect()->route('ai-agent.conversation', $conversation)
