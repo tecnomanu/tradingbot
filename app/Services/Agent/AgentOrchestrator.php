@@ -2,6 +2,7 @@
 
 namespace App\Services\Agent;
 
+use App\Enums\AgentTrigger;
 use App\Models\AiConversation;
 use App\Models\AiConversationMessage;
 use App\Models\Bot;
@@ -26,14 +27,14 @@ class AgentOrchestrator
         $this->apiKey = config('services.ai.key') ?: '';
     }
 
-    public function consult(Bot $bot, string $trigger = 'scheduled', ?string $alertContext = null): AiConversation
+    public function consult(Bot $bot, AgentTrigger $trigger = AgentTrigger::Scheduled, ?string $alertContext = null): AiConversation
     {
         $startTime = microtime(true);
 
         $conversation = AiConversation::create([
             'bot_id' => $bot->id,
             'status' => 'running',
-            'trigger' => $trigger,
+            'trigger' => $trigger->value,
             'model' => $this->model,
             'started_at' => now(),
         ]);
@@ -88,12 +89,12 @@ class AgentOrchestrator
         return $conversation;
     }
 
-    private function buildInitialMessages(Bot $bot, string $trigger = 'scheduled', ?string $alertContext = null): array
+    private function buildInitialMessages(Bot $bot, AgentTrigger $trigger = AgentTrigger::Scheduled, ?string $alertContext = null): array
     {
         $personality = $bot->ai_system_prompt ?: static::defaultPersonality();
         $systemPrompt = $personality . "\n\n" . static::operationalPrompt();
 
-        if ($trigger === 'scheduled') {
+        if ($trigger === AgentTrigger::Scheduled) {
             $systemPrompt .= "\n\n" . static::scheduledModeConstraints();
         }
 
@@ -321,6 +322,17 @@ PROMPT;
             }
         }
 
+        // If actions were taken but done() was never called (LLM ran out of token budget
+        // after thinking), build a minimal summary from the logged actions so the UI
+        // shows something meaningful instead of "Agent did not complete analysis".
+        if ($output['summary'] === 'Agent did not complete analysis') {
+            $actionLogs = $conversation->actionLogs()->get();
+            if ($actionLogs->isNotEmpty()) {
+                $actionNames = $actionLogs->pluck('action')->join(', ');
+                $output['summary'] = "Acciones ejecutadas sin análisis final: {$actionNames}.";
+            }
+        }
+
         return $output;
     }
 
@@ -378,7 +390,9 @@ PROMPT;
                 'tools' => $this->toolkit->getToolDefinitions(),
                 'tool_choice' => 'auto',
                 'temperature' => $isThinkingModel ? 0.6 : 0.2,
-                'max_tokens' => $isThinkingModel ? 2048 : 1024,
+                // Thinking models (qwen, deepseek) use ~1500 tokens on <think> alone;
+                // 2048 left no room for tool calls, causing empty responses.
+                'max_tokens' => $isThinkingModel ? 4096 : 2048,
             ];
 
             $response = Http::withHeaders([

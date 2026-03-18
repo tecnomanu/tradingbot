@@ -2,6 +2,12 @@
 
 namespace App\Services\Agent;
 
+use App\Constants\BinanceConstants;
+use App\Enums\ActionSource;
+use App\Enums\AgentTrigger;
+use App\Enums\BotStatus;
+use App\Enums\OrderSide;
+use App\Enums\OrderStatus;
 use App\Models\Bot;
 use App\Models\BotActionLog;
 use App\Services\AiTradingAgent;
@@ -14,7 +20,7 @@ use App\Support\BotLog as Log;
 class AgentToolkit
 {
     private ?int $conversationId = null;
-    private string $trigger = 'scheduled';
+    private AgentTrigger $trigger = AgentTrigger::Scheduled;
 
     public function __construct(
         private GridTradingEngine $engine,
@@ -29,7 +35,7 @@ class AgentToolkit
         $this->conversationId = $id;
     }
 
-    public function setTrigger(string $trigger): void
+    public function setTrigger(AgentTrigger $trigger): void
     {
         $this->trigger = $trigger;
     }
@@ -106,7 +112,7 @@ class AgentToolkit
     public function executeTool(string $name, array $args, Bot $bot): array
     {
         // Hard block: never modify a stopped bot
-        if (in_array($name, self::ACTION_TOOLS) && $bot->status->value === 'stopped') {
+        if (in_array($name, self::ACTION_TOOLS) && $bot->status === BotStatus::Stopped) {
             return ['error' => 'Bot is stopped. Cannot execute action tools on a stopped bot. Only reporting tools are allowed.'];
         }
 
@@ -156,20 +162,20 @@ class AgentToolkit
             'rounds' => $bot->total_rounds,
             'sl' => $bot->stop_loss_price ? (float) $bot->stop_loss_price : null,
             'tp' => $bot->take_profit_price ? (float) $bot->take_profit_price : null,
-            'open_orders' => $bot->orders()->where('status', 'open')->count(),
-            'filled_orders' => $bot->orders()->where('status', 'filled')->count(),
+            'open_orders' => $bot->orders()->where('status', OrderStatus::Open)->count(),
+            'filled_orders' => $bot->orders()->where('status', OrderStatus::Filled)->count(),
         ];
     }
 
     private function toolGetOpenOrders(Bot $bot): array
     {
         $orders = $bot->orders()
-            ->where('status', 'open')
+            ->where('status', OrderStatus::Open)
             ->orderBy('price')
             ->get(['side', 'price', 'grid_level']);
 
-        $buys = $orders->filter(fn($o) => $o->side->value === 'BUY');
-        $sells = $orders->filter(fn($o) => $o->side->value === 'SELL');
+        $buys = $orders->filter(fn($o) => $o->side === OrderSide::Buy);
+        $sells = $orders->filter(fn($o) => $o->side === OrderSide::Sell);
 
         return [
             'total' => $orders->count(),
@@ -195,12 +201,12 @@ class AgentToolkit
 
     private function toolGetFilledOrders(Bot $bot, array $args): array
     {
-        $allFilled = $bot->orders()->where('status', 'filled');
+        $allFilled = $bot->orders()->where('status', OrderStatus::Filled);
         $totalCount = $allFilled->count();
         $totalPnl = round((clone $allFilled)->sum('pnl'), 4);
 
         $recent = $bot->orders()
-            ->where('status', 'filled')
+            ->where('status', OrderStatus::Filled)
             ->orderByDesc('filled_at')
             ->limit(3)
             ->get(['side', 'price', 'pnl', 'grid_level', 'filled_at']);
@@ -256,7 +262,7 @@ class AgentToolkit
 
         $bot->update(['stop_loss_price' => $price]);
 
-        $this->logAction($bot, 'sl_set', 'agent', [
+        $this->logAction($bot, 'sl_set', ActionSource::Agent, [
             'price' => $price,
             'previous' => $before ?: null,
         ]);
@@ -278,7 +284,7 @@ class AgentToolkit
 
         $bot->update(['take_profit_price' => $price]);
 
-        $this->logAction($bot, 'tp_set', 'agent', [
+        $this->logAction($bot, 'tp_set', ActionSource::Agent, [
             'price' => $price,
             'previous' => $before ?: null,
         ]);
@@ -305,7 +311,7 @@ class AgentToolkit
 
         try {
             $this->binanceFutures->cancelAllOrders($account, $bot->symbol);
-            $bot->orders()->where('status', 'open')->update(['status' => 'cancelled']);
+            $bot->orders()->where('status', OrderStatus::Open)->update(['status' => OrderStatus::Cancelled]);
 
             $bot->update([
                 'price_lower' => $newLower,
@@ -314,7 +320,7 @@ class AgentToolkit
 
             $this->engine->reinitializeGrid($bot->fresh());
 
-            $this->logAction($bot, 'grid_adjusted', 'agent', [
+            $this->logAction($bot, 'grid_adjusted', ActionSource::Agent, [
                 'old_range' => "{$oldLower}-{$oldUpper}",
                 'new_range' => "{$newLower}-{$newUpper}",
             ]);
@@ -338,11 +344,11 @@ class AgentToolkit
             return ['error' => 'No Binance account'];
         }
 
-        $openCount = $bot->orders()->where('status', 'open')->count();
+        $openCount = $bot->orders()->where('status', OrderStatus::Open)->count();
         $this->binanceFutures->cancelAllOrders($account, $bot->symbol);
-        $bot->orders()->where('status', 'open')->update(['status' => 'cancelled']);
+        $bot->orders()->where('status', OrderStatus::Open)->update(['status' => OrderStatus::Cancelled]);
 
-        $this->logAction($bot, 'orders_cancelled', 'agent', [
+        $this->logAction($bot, 'orders_cancelled', ActionSource::Agent, [
             'cancelled_count' => $openCount,
         ]);
 
@@ -353,23 +359,25 @@ class AgentToolkit
     {
         $reason = $args['reason'] ?? 'Agent decision';
 
-        // In scheduled (routine) runs, blocking stop_bot prevents the self-defeating loop:
-        // bot stops → agent stops running → bot stays stopped forever with no recovery.
-        // Manual consultations and alert consultations (sl_tp_alert) are allowed to stop.
-        if ($this->trigger === 'scheduled') {
-            $this->logAction($bot, 'bot_stop_blocked', 'agent', [
+        // Block stop_bot for all automatic triggers (scheduled + sl_tp_alert).
+        // Only manual user-initiated consultations may stop the bot.
+        // Rationale: auto-stopping creates a permanent outage — the agent only monitors active
+        // bots, so stopping the bot also stops monitoring with no automatic recovery.
+        // For SL/TP alerts the intent is repair (adjust_grid + new SL/TP), not shutdown.
+        if (in_array($this->trigger, [AgentTrigger::Scheduled, AgentTrigger::SlTpAlert])) {
+            $this->logAction($bot, 'bot_stop_blocked', ActionSource::Agent, [
                 'reason' => $reason,
-                'trigger' => 'scheduled',
+                'trigger' => $this->trigger->value,
             ]);
 
             return [
                 'blocked' => true,
-                'message' => 'stop_bot is disabled in scheduled mode. Auto-stopping creates a permanent outage because the agent only runs on active bots — if the bot stops, the agent stops too and the bot stays stopped forever.',
-                'action_required' => 'To protect capital without stopping: (1) call close_position to reduce exposure, (2) call adjust_grid to recenter the grid at a safer price range. The situation has been flagged in the activity log.',
+                'message' => "stop_bot is disabled for trigger '{$this->trigger->value}'. Only manual consultations can stop the bot. Auto-stopping creates a permanent outage — the agent only runs on active bots.",
+                'action_required' => 'Repair instead: (1) close_position to reduce exposure, (2) adjust_grid to recenter around current price, (3) set new SL/TP values that are NOT already breached.',
             ];
         }
 
-        $this->logAction($bot, 'bot_stopped', 'agent', ['reason' => $reason]);
+        $this->logAction($bot, 'bot_stopped', ActionSource::Agent, ['reason' => $reason]);
         $this->engine->stopBot($bot);
 
         return ['success' => true, 'message' => "Bot stopped: {$reason}"];
@@ -389,10 +397,10 @@ class AgentToolkit
 
         $pos = $positions[0];
         $posAmt = (float) $pos['positionAmt'];
-        $side = $posAmt > 0 ? 'SELL' : 'BUY';
+        $side = $posAmt > 0 ? BinanceConstants::SIDE_SELL : BinanceConstants::SIDE_BUY;
         $qty = $this->binanceFutures->formatQuantity($bot->symbol, abs($posAmt));
 
-        $this->logAction($bot, 'position_closed', 'agent', [
+        $this->logAction($bot, 'position_closed', ActionSource::Agent, [
             'size' => $posAmt,
             'close_side' => $side,
             'unrealized_pnl' => $pos['unRealizedProfit'] ?? 0,
@@ -403,13 +411,13 @@ class AgentToolkit
         return ['success' => true, 'closed_size' => $posAmt, 'close_side' => $side];
     }
 
-    private function logAction(Bot $bot, string $action, string $source, array $details = []): void
+    private function logAction(Bot $bot, string $action, ActionSource $source, array $details = []): void
     {
         BotActionLog::create([
             'bot_id' => $bot->id,
             'conversation_id' => $this->conversationId,
             'action' => $action,
-            'source' => $source,
+            'source' => $source->value,
             'details' => $details,
         ]);
     }

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Constants\BinanceConstants;
+use App\Enums\AgentTrigger;
 use App\Enums\BotSide;
 use App\Enums\BotStatus;
 use App\Enums\OrderSide;
@@ -13,6 +15,7 @@ use App\Repositories\BotRepository;
 use App\Repositories\OrderRepository;
 use App\Services\BotActivityLogger;
 use Exception;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use App\Support\BotLog as Log;
 
@@ -85,7 +88,7 @@ class GridTradingEngine
         foreach ($orders as $order) {
             $isBuyOrder = $order->price < $currentPrice;
             $expectedSide = $isBuyOrder ? OrderSide::Buy : OrderSide::Sell;
-            $binanceSide = $isBuyOrder ? 'BUY' : 'SELL';
+            $binanceSide = $isBuyOrder ? BinanceConstants::SIDE_BUY : BinanceConstants::SIDE_SELL;
 
             if ($order->side !== $expectedSide) {
                 $order->update(['side' => $expectedSide]);
@@ -276,32 +279,69 @@ class GridTradingEngine
             $triggered = 'take_profit';
         }
 
-        if ($triggered) {
-            Log::warning("GridEngine: {$triggered} triggered — dispatching agent alert instead of hard stop", [
+        if (!$triggered) {
+            return;
+        }
+
+        // Cooldown guard: ShouldBeUnique releases its lock once the job completes (seconds),
+        // so with a sync queue the unique window expires before the next tick.
+        // We use Cache as a persistent 15-minute gate regardless of queue driver.
+        $cacheKey = "bot_sl_tp_cooldown.{$bot->id}.{$triggered}";
+        if (Cache::has($cacheKey)) {
+            Log::info("GridEngine: {$triggered} in cooldown, skipping alert dispatch", [
                 'bot_id' => $bot->id,
                 'current_price' => $currentPrice,
-                'sl' => $bot->stop_loss_price,
-                'tp' => $bot->take_profit_price,
             ]);
-
-            // Log the alert so it's visible in the bot historial
-            BotActivityLogger::logSystemAction($bot, 'bot_sl_tp_alert', [
-                'trigger' => $triggered,
-                'current_price' => $currentPrice,
-                'stop_loss_price' => $bot->stop_loss_price,
-                'take_profit_price' => $bot->take_profit_price,
-            ]);
-
-            // Instead of stopping directly, fire an agent consultation with full context.
-            // The agent will decide: close_position, adjust_grid, tighten SL, or stop_bot.
-            // This ensures: audit trail, Telegram notification per config, and a chance to
-            // recover the position instead of a blind hard stop.
-            $alertContext = $triggered === 'stop_loss'
-                ? "CRITICAL: Stop-Loss price reached. Current price: {$currentPrice}, SL: {$bot->stop_loss_price}. Immediate action required: check position, consider close_position + adjust_grid or stop_bot."
-                : "CRITICAL: Take-Profit price reached. Current price: {$currentPrice}, TP: {$bot->take_profit_price}. Immediate action required: close_position to realize profits, then adjust_grid or stop_bot.";
-
-            RunAgentAlertJob::dispatch($bot, 'sl_tp_alert', $alertContext);
+            return;
         }
+
+        Cache::put($cacheKey, true, now()->addMinutes(15));
+
+        Log::warning("GridEngine: {$triggered} triggered — dispatching agent alert", [
+            'bot_id' => $bot->id,
+            'current_price' => $currentPrice,
+            'sl' => $bot->stop_loss_price,
+            'tp' => $bot->take_profit_price,
+        ]);
+
+        BotActivityLogger::logSystemAction($bot, 'bot_sl_tp_alert', [
+            'trigger' => $triggered,
+            'current_price' => $currentPrice,
+            'stop_loss_price' => $bot->stop_loss_price,
+            'take_profit_price' => $bot->take_profit_price,
+        ]);
+
+        RunAgentAlertJob::dispatch($bot, AgentTrigger::SlTpAlert, $this->buildAlertContext($triggered, $currentPrice, $bot));
+    }
+
+    /**
+     * Build an explicit, actionable alert context for the agent.
+     * For TP alerts we must instruct the agent to set a NEW TP value (not the old one)
+     * to break the trigger loop — if the old TP value is reused, checkStopConditions
+     * will fire again on the next tick.
+     */
+    private function buildAlertContext(string $triggered, float $currentPrice, Bot $bot): string
+    {
+        if ($triggered === 'stop_loss') {
+            return "CRITICAL: Stop-Loss price ({$bot->stop_loss_price}) has been reached. " .
+                "Current price: {$currentPrice}. " .
+                "REQUIRED ACTIONS — execute in order: " .
+                "(1) close_position to exit the open position, " .
+                "(2) adjust_grid centering the range around {$currentPrice}, " .
+                "(3) set_stop_loss to a new protective price below {$currentPrice}. " .
+                "Do NOT call stop_bot — adjust protections and keep the bot running.";
+        }
+
+        $suggestedNewTp = round($currentPrice * 1.02, 2);
+        return "CRITICAL: Take-Profit price ({$bot->take_profit_price}) has been reached and " .
+            "WILL KEEP TRIGGERING EVERY MINUTE until you update it to a NEW value. " .
+            "Current price: {$currentPrice}. " .
+            "REQUIRED ACTIONS — execute in order: " .
+            "(1) close_position if a position is still open, " .
+            "(2) adjust_grid centering the range around {$currentPrice}, " .
+            "(3) set_take_profit to a NEW price above {$currentPrice} — minimum suggested: {$suggestedNewTp}. " .
+            "DO NOT reuse the old TP value ({$bot->take_profit_price}) — it is already breached. " .
+            "Do NOT call stop_bot — adjust and keep the bot running.";
     }
 
     /**
@@ -310,14 +350,14 @@ class GridTradingEngine
     private function closePosition($account, string $symbol, float $positionAmt): void
     {
         try {
-            $side = $positionAmt > 0 ? 'SELL' : 'BUY';
+            $side = $positionAmt > 0 ? BinanceConstants::SIDE_SELL : BinanceConstants::SIDE_BUY;
             $qty = abs($positionAmt);
             $formattedQty = $this->binance->formatQuantity($symbol, $qty);
 
             $client = $this->binance->createClient($account);
             $request = new \Binance\Client\DerivativesTradingUsdsFutures\Model\NewOrderRequest([
                 'symbol' => $symbol,
-                'side' => $side === 'BUY'
+                'side' => $side === BinanceConstants::SIDE_BUY
                     ? \Binance\Client\DerivativesTradingUsdsFutures\Model\Side::BUY
                     : \Binance\Client\DerivativesTradingUsdsFutures\Model\Side::SELL,
                 'type' => 'MARKET',
@@ -521,7 +561,7 @@ class GridTradingEngine
         float $price,
         float $quantity,
     ): bool {
-        $binanceSide = $side === OrderSide::Buy ? 'BUY' : 'SELL';
+        $binanceSide = $side === OrderSide::Buy ? BinanceConstants::SIDE_BUY : BinanceConstants::SIDE_SELL;
         $formattedQty = $this->binance->formatQuantity($bot->symbol, $quantity);
         $formattedPrice = $this->binance->formatPrice($bot->symbol, $price);
 
@@ -686,7 +726,7 @@ class GridTradingEngine
         $placedCount = 0;
 
         foreach ($newOrders as $order) {
-            $binanceSide = $order->side === OrderSide::Buy ? 'BUY' : 'SELL';
+            $binanceSide = $order->side === OrderSide::Buy ? BinanceConstants::SIDE_BUY : BinanceConstants::SIDE_SELL;
             $qty = $this->binance->formatQuantity($bot->symbol, $order->quantity);
             $formattedPrice = $this->binance->formatPrice($bot->symbol, $order->price);
 
@@ -781,7 +821,7 @@ class GridTradingEngine
         $placedCount = 0;
 
         foreach ($newOrders as $order) {
-            $binanceSide = $order->side === OrderSide::Buy ? 'BUY' : 'SELL';
+            $binanceSide = $order->side === OrderSide::Buy ? BinanceConstants::SIDE_BUY : BinanceConstants::SIDE_SELL;
             $qty = $this->binance->formatQuantity($bot->symbol, $order->quantity);
             $formattedPrice = $this->binance->formatPrice($bot->symbol, $order->price);
 
