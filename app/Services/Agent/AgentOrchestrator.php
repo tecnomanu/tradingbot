@@ -39,9 +39,10 @@ class AgentOrchestrator
         ]);
 
         $this->toolkit->setConversationId($conversation->id);
+        $this->toolkit->setTrigger($trigger);
 
         try {
-            $messages = $this->buildInitialMessages($bot);
+            $messages = $this->buildInitialMessages($bot, $trigger);
             $this->storeMessages($conversation, $messages);
 
             $result = $this->runAgentLoop($conversation, $bot, $messages);
@@ -87,10 +88,14 @@ class AgentOrchestrator
         return $conversation;
     }
 
-    private function buildInitialMessages(Bot $bot): array
+    private function buildInitialMessages(Bot $bot, string $trigger = 'scheduled'): array
     {
         $personality = $bot->ai_system_prompt ?: static::defaultPersonality();
         $systemPrompt = $personality . "\n\n" . static::operationalPrompt();
+
+        if ($trigger === 'scheduled') {
+            $systemPrompt .= "\n\n" . static::scheduledModeConstraints();
+        }
 
         $userPrompt = $this->interpolateUserPrompt(
             $bot->ai_user_prompt ?: static::defaultUserPrompt(),
@@ -142,6 +147,27 @@ If none → do NOT call any action tool.
 ## OUTPUT (done tool)
 - analysis: 3-5 sentences in Spanish. Include price, grid_position% calculation, RSI, MACD, Bollinger. Explain actions or why none taken. Must be coherent with actions (don't say "no intervention" if you acted).
 - summary: 1 sentence in Spanish.
+PROMPT;
+    }
+
+    /**
+     * Extra constraints injected only in scheduled (auto) consultations.
+     * Prevents the self-defeating loop: agent stops bot → agent stops running → bot stuck forever.
+     */
+    public static function scheduledModeConstraints(): string
+    {
+        return <<<'PROMPT'
+## SCHEDULED MODE — CRITICAL CONSTRAINT
+stop_bot is DISABLED. Calling it will be blocked and will NOT stop the bot.
+Reason: if the bot stops, this agent stops running (it only monitors active bots), creating a permanent outage with no automatic recovery.
+
+If the situation is critical (large unrealized loss, extreme price move):
+1. call close_position → reduces open exposure immediately
+2. call adjust_grid → recenter grid around current price to adapt to new conditions
+3. tighten stop_loss → set a protective SL close to current price
+This protects capital WITHOUT stopping the bot. The agent will continue monitoring.
+
+Only a manual consultation (user-triggered) can stop the bot.
 PROMPT;
     }
 

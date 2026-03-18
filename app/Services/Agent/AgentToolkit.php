@@ -14,6 +14,7 @@ use App\Support\BotLog as Log;
 class AgentToolkit
 {
     private ?int $conversationId = null;
+    private string $trigger = 'scheduled';
 
     public function __construct(
         private GridTradingEngine $engine,
@@ -26,6 +27,11 @@ class AgentToolkit
     public function setConversationId(int $id): void
     {
         $this->conversationId = $id;
+    }
+
+    public function setTrigger(string $trigger): void
+    {
+        $this->trigger = $trigger;
     }
 
     /**
@@ -346,6 +352,22 @@ class AgentToolkit
     private function toolStopBot(Bot $bot, array $args): array
     {
         $reason = $args['reason'] ?? 'Agent decision';
+
+        // In scheduled runs, blocking stop_bot prevents the self-defeating loop:
+        // bot stops → agent stops running → bot stays stopped forever with no recovery.
+        // Only manual consultations (user-triggered) are allowed to stop the bot.
+        if ($this->trigger === 'scheduled') {
+            $this->logAction($bot, 'bot_stop_blocked', 'agent', [
+                'reason' => $reason,
+                'trigger' => 'scheduled',
+            ]);
+
+            return [
+                'blocked' => true,
+                'message' => 'stop_bot is disabled in scheduled mode. Auto-stopping creates a permanent outage because the agent only runs on active bots — if the bot stops, the agent stops too and the bot stays stopped forever.',
+                'action_required' => 'To protect capital without stopping: (1) call close_position to reduce exposure, (2) call adjust_grid to recenter the grid at a safer price range. The situation has been flagged in the activity log.',
+            ];
+        }
 
         $this->logAction($bot, 'bot_stopped', 'agent', ['reason' => $reason]);
         $this->engine->stopBot($bot);

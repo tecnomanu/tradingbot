@@ -1162,6 +1162,7 @@ const actionLabels: Record<string, string> = {
     bot_created: "Bot creado",
     bot_started: "Bot iniciado",
     bot_stopped: "Bot detenido",
+    bot_stop_blocked: "Stop bloqueado (auto)",
     bot_updated: "Bot actualizado",
     bot_deleted: "Bot eliminado",
     order_placed: "Orden colocada",
