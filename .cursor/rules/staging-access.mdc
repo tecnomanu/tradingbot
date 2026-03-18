@@ -1,0 +1,17 @@
+---
+description: Credenciales de acceso para entornos de desarrollo y staging
+alwaysApply: true
+---
+
+# Accesos del proyecto TradingBot
+
+## Staging / Testing (Tailscale)
+- URL: http://wizardgpt.tail100e88.ts.net:8100
+- Usuario: admin@tradingbot.local
+- Contraseña: Admin1234!
+
+## Localhost (desarrollo local)
+- URL: http://localhost:8100 (o puerto configurado)
+- Mismas credenciales: admin@tradingbot.local / Admin1234!
+
+> Nota: el servidor de staging corre en Tailscale (`wizardgpt.tail100e88.ts.net`), solo accesible dentro de la red Tailscale.

@@ -17,14 +17,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import {
@@ -34,10 +26,14 @@ import {
     Brain,
     Clock,
     MessageSquare,
+    Monitor,
     Play,
+    Server,
     Shield,
     Sparkles,
+    User,
     Wrench,
+    Zap,
 } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { Toaster, toast } from "sonner";
@@ -65,8 +61,12 @@ interface ActionLog {
     conversation_id: number | null;
     action: string;
     source: string;
+    actor_label: string;
     details: Record<string, any> | null;
+    before_state: Record<string, any> | null;
+    after_state: Record<string, any> | null;
     created_at: string;
+    created_at_fmt: string;
     bot?: { id: number; symbol: string } | null;
 }
 
@@ -113,39 +113,60 @@ function formatTimestamp(date: Date): string {
 }
 
 const actionLabels: Record<string, string> = {
+    bot_created: "Bot creado",
+    bot_started: "Bot iniciado",
+    bot_stopped: "Bot detenido",
+    bot_updated: "Bot actualizado",
+    bot_deleted: "Bot eliminado",
     sl_set: "Stop-Loss",
     tp_set: "Take-Profit",
-    bot_stopped: "Bot Detenido",
-    orders_cancelled: "Órdenes Canceladas",
-    position_closed: "Posición Cerrada",
-    grid_adjusted: "Grid Ajustado",
+    orders_cancelled: "Órdenes canceladas",
+    order_placed: "Orden colocada",
+    order_cancelled: "Orden cancelada",
+    position_closed: "Posición cerrada",
+    grid_adjusted: "Grid ajustado",
+    leverage_changed: "Apalancamiento cambiado",
 };
 
 const actionColors: Record<string, string> = {
+    bot_started: "text-emerald-400",
+    bot_stopped: "text-red-400",
+    bot_created: "text-blue-400",
+    bot_updated: "text-sky-400",
     sl_set: "text-yellow-400",
     tp_set: "text-emerald-400",
-    bot_stopped: "text-red-400",
     orders_cancelled: "text-orange-400",
     position_closed: "text-red-400",
     grid_adjusted: "text-blue-400",
+    leverage_changed: "text-purple-400",
+};
+
+const sourceConfig: Record<string, { icon: typeof User; color: string; bg: string; border: string }> = {
+    user:   { icon: User,    color: "text-blue-500",   bg: "bg-blue-500/10",   border: "border-blue-500/20" },
+    api:    { icon: Zap,     color: "text-amber-500",  bg: "bg-amber-500/10",  border: "border-amber-500/20" },
+    agent:  { icon: Brain,   color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+    system: { icon: Server,  color: "text-gray-400",   bg: "bg-gray-500/10",   border: "border-gray-500/20" },
+    manual: { icon: Monitor, color: "text-cyan-500",   bg: "bg-cyan-500/10",   border: "border-cyan-500/20" },
 };
 
 function formatActionDetails(action: string, details: Record<string, any> | null): string {
     if (!details) return "";
-    switch (action) {
-        case "sl_set":
-            return `$${Number(details.price).toLocaleString()}${details.previous ? ` (anterior: $${Number(details.previous).toLocaleString()})` : ""}`;
-        case "tp_set":
-            return `$${Number(details.price).toLocaleString()}${details.previous ? ` (anterior: $${Number(details.previous).toLocaleString()})` : ""}`;
-        case "orders_cancelled":
-            return `${details.cancelled_count} órdenes canceladas`;
-        case "bot_stopped":
-            return details.reason || "";
-        case "position_closed":
-            return `${details.close_side} ${Math.abs(details.size)} | PNL: ${details.unrealized_pnl}`;
-        default:
-            return JSON.stringify(details);
-    }
+    const parts: string[] = [];
+    if (details.reason) parts.push(details.reason);
+    if (details.price !== undefined) parts.push(`$${Number(details.price).toLocaleString()}${details.previous ? ` (anterior: $${Number(details.previous).toLocaleString()})` : ""}`);
+    if (details.current_price !== undefined) parts.push(`Precio: $${Number(details.current_price).toLocaleString()}`);
+    if (details.stop_loss_price !== undefined && details.stop_loss_price) parts.push(`SL: $${Number(details.stop_loss_price).toLocaleString()}`);
+    if (details.take_profit_price !== undefined && details.take_profit_price) parts.push(`TP: $${Number(details.take_profit_price).toLocaleString()}`);
+    if (details.cancelled_count !== undefined) parts.push(`${details.cancelled_count} órdenes`);
+    if (details.close_side) parts.push(`${details.close_side} ${Math.abs(details.size ?? 0)}`);
+    if (details.unrealized_pnl !== undefined) parts.push(`PNL: ${details.unrealized_pnl}`);
+    if (details.fields_changed) parts.push(`Campos: ${details.fields_changed.join(", ")}`);
+    if (details.new_lower !== undefined) parts.push(`${details.new_lower} – ${details.new_upper}`);
+    if (parts.length > 0) return parts.join(" · ");
+    const filtered = Object.entries(details)
+        .filter(([, v]) => v !== null && v !== undefined)
+        .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`);
+    return filtered.join(", ");
 }
 
 const INCOMPLETE_ANALYSIS = "Agent did not complete analysis";
@@ -379,43 +400,50 @@ export default function AiAgentIndex({
                                         </p>
                                     </div>
                                 ) : (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Fecha</TableHead>
-                                                <TableHead>Tipo</TableHead>
-                                                <TableHead>Bot</TableHead>
-                                                <TableHead>Detalles</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {filteredActions.map((log) => (
-                                                <TableRow key={log.id}>
-                                                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                                                        {formatTimestamp(new Date(log.created_at))}
-                                                        <br />
-                                                        <span className="text-[10px]">{timeAgo(new Date(log.created_at))}</span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className={`font-medium text-sm ${actionColors[log.action] || "text-foreground"}`}>
-                                                            {actionLabels[log.action] || log.action}
-                                                        </span>
-                                                        <Badge variant="outline" className="ml-1.5 text-[10px]">
-                                                            {log.source}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="secondary" className="text-[10px]">
-                                                            {log.bot?.symbol || `Bot #${log.bot_id}`}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                                                        {formatActionDetails(log.action, log.details) || "—"}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                    <div className="divide-y divide-border">
+                                        {filteredActions.map((log) => {
+                                            const cfg = sourceConfig[log.source] ?? sourceConfig.system;
+                                            const Icon = cfg.icon;
+                                            const detailStr = formatActionDetails(log.action, log.details);
+                                            const d = new Date(log.created_at);
+                                            return (
+                                                <div key={log.id} className="flex items-start gap-3 px-4 py-3 hover:bg-muted/20 transition-colors">
+                                                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${cfg.bg}`}>
+                                                        <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className={`text-sm font-medium ${actionColors[log.action] || "text-foreground"}`}>
+                                                                {actionLabels[log.action] || log.action}
+                                                            </span>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`text-[10px] ${cfg.color} ${cfg.border}`}
+                                                            >
+                                                                {log.actor_label ?? log.source}
+                                                            </Badge>
+                                                            <Badge variant="secondary" className="text-[10px]">
+                                                                {log.bot?.symbol || `Bot #${log.bot_id}`}
+                                                            </Badge>
+                                                        </div>
+                                                        {detailStr && (
+                                                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                                                {detailStr}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-xs text-muted-foreground tabular-nums">
+                                                            {log.created_at_fmt ?? formatTimestamp(d)}
+                                                        </p>
+                                                        <p className="text-[10px] text-muted-foreground/70">
+                                                            {timeAgo(d)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>

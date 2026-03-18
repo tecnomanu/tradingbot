@@ -10,6 +10,7 @@ use App\Models\Bot;
 use App\Models\Order;
 use App\Repositories\BotRepository;
 use App\Repositories\OrderRepository;
+use App\Services\BotActivityLogger;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use App\Support\BotLog as Log;
@@ -280,6 +281,13 @@ class GridTradingEngine
                 'current_price' => $currentPrice,
                 'sl' => $bot->stop_loss_price,
                 'tp' => $bot->take_profit_price,
+            ]);
+
+            BotActivityLogger::logSystemAction($bot, 'bot_stopped', [
+                'reason' => $triggered === 'stop_loss' ? 'Stop Loss activado' : 'Take Profit activado',
+                'current_price' => $currentPrice,
+                'stop_loss_price' => $bot->stop_loss_price,
+                'take_profit_price' => $bot->take_profit_price,
             ]);
 
             $this->stopBot($bot);

@@ -22,11 +22,25 @@ class AiAgentController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        $actionLogs = BotActionLog::with('bot')
+        $actionLogs = BotActionLog::with(['bot', 'user'])
             ->whereIn('bot_id', $botIds)
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get();
+            ->get()
+            ->map(fn (BotActionLog $log) => [
+                'id' => $log->id,
+                'bot_id' => $log->bot_id,
+                'conversation_id' => $log->conversation_id,
+                'action' => $log->action,
+                'source' => $log->source,
+                'actor_label' => $log->actor_label,
+                'details' => $log->details,
+                'before_state' => $log->before_state,
+                'after_state' => $log->after_state,
+                'created_at' => $log->created_at->toIso8601String(),
+                'created_at_fmt' => $log->created_at->format('d/m H:i'),
+                'bot' => $log->bot ? ['id' => $log->bot->id, 'symbol' => $log->bot->symbol] : null,
+            ]);
 
         $stats = [
             'total_conversations' => AiConversation::whereIn('bot_id', $botIds)->count(),
