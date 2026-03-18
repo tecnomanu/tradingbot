@@ -12,9 +12,12 @@ import {
     Bot as BotIcon,
     Brain,
     Grid3x3,
+    Monitor,
     Plus,
+    Server,
     ShoppingCart,
     TrendingUp,
+    User,
     Wallet,
     Zap,
 } from "lucide-react";
@@ -60,8 +63,43 @@ interface RecentAction {
     symbol: string;
     action: string;
     source: string;
+    actor_label: string;
     created_at: string;
 }
+
+const actionLabels: Record<string, string> = {
+    bot_created: "Bot creado",
+    bot_started: "Bot iniciado",
+    bot_stopped: "Bot detenido",
+    bot_stop_blocked: "Stop bloqueado",
+    bot_updated: "Bot actualizado",
+    sl_set: "Stop-Loss",
+    tp_set: "Take-Profit",
+    orders_cancelled: "Órdenes canceladas",
+    position_closed: "Posición cerrada",
+    grid_adjusted: "Grid ajustado",
+    leverage_changed: "Apalancamiento",
+};
+
+const actionColors: Record<string, string> = {
+    bot_started: "text-emerald-500",
+    bot_stopped: "text-red-500",
+    bot_stop_blocked: "text-amber-500",
+    bot_updated: "text-sky-400",
+    sl_set: "text-yellow-500",
+    tp_set: "text-emerald-500",
+    orders_cancelled: "text-orange-500",
+    position_closed: "text-red-400",
+    grid_adjusted: "text-blue-400",
+};
+
+const sourceConfig: Record<string, { icon: typeof User; color: string }> = {
+    user:   { icon: User,    color: "text-blue-500"   },
+    api:    { icon: Zap,     color: "text-amber-500"  },
+    agent:  { icon: Brain,   color: "text-purple-500" },
+    system: { icon: Server,  color: "text-gray-400"   },
+    manual: { icon: Monitor, color: "text-cyan-500"   },
+};
 
 interface DashboardProps {
     stats: DashboardStats;
@@ -421,16 +459,24 @@ export default function Index({
                                 <p className="text-xs text-muted-foreground py-2 text-center">Sin acciones del agente</p>
                             ) : (
                                 <div className="space-y-1.5">
-                                    {recentActions.map((action) => (
-                                        <div key={action.id} className="flex items-center justify-between text-[11px] py-1 border-b border-dashed last:border-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <Zap className="h-3 w-3 text-purple-500" />
-                                                <span className="font-medium">{action.action}</span>
-                                                <Badge variant="outline" className="text-[8px] h-4 px-1">{action.source}</Badge>
+                                    {recentActions.map((action) => {
+                                        const cfg = sourceConfig[action.source] ?? sourceConfig.system;
+                                        const Icon = cfg.icon;
+                                        return (
+                                            <div key={action.id} className="flex items-center justify-between text-[11px] py-1 border-b border-dashed last:border-0">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <Icon className={`h-3 w-3 shrink-0 ${cfg.color}`} />
+                                                    <span className={`font-medium truncate ${actionColors[action.action] || "text-foreground"}`}>
+                                                        {actionLabels[action.action] || action.action}
+                                                    </span>
+                                                    <Badge variant="outline" className={`text-[8px] h-4 px-1 shrink-0 ${cfg.color}`}>
+                                                        {action.actor_label ?? action.source}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-muted-foreground shrink-0 ml-1">{timeSince(action.created_at)}</span>
                                             </div>
-                                            <span className="text-muted-foreground">{timeSince(action.created_at)}</span>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </CardContent>

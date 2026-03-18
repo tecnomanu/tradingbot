@@ -60,7 +60,7 @@ class DashboardController extends Controller
             ]);
 
         $recentActions = BotActionLog::whereIn('bot_id', $botIds)
-            ->with('bot:id,symbol')
+            ->with(['bot:id,symbol', 'user:id,name'])
             ->latest()
             ->limit(5)
             ->get()
@@ -69,6 +69,7 @@ class DashboardController extends Controller
                 'symbol' => $a->bot?->symbol,
                 'action' => $a->action,
                 'source' => $a->source,
+                'actor_label' => $a->actor_label,
                 'created_at' => $a->created_at->toIso8601String(),
             ]);
 
