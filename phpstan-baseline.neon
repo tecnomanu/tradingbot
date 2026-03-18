@@ -1,0 +1,757 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AiAgentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/AiAgentController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\BotActionLog\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/AiAgentController.php
+
+		-
+			message: '#^Part \$bot\-\>side \(App\\Enums\\BotSide\) of encapsed string cannot be cast to string\.$#'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: app/Http/Controllers/AiAgentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$content\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$summary\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tokens\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tool_args\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tool_call_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tool_calls\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tool_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$tool_result\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Anonymous function should return array\{id\: int, bot_id\: int\<0, max\>, bot_name\: mixed, bot_symbol\: mixed, status\: string, trigger\: string, model\: string\|null, summary\: string\|null, \.\.\.\} but returns array\{id\: int, bot_id\: int\<0, max\>, bot_name\: mixed, bot_symbol\: mixed, status\: string, trigger\: string, model\: string\|null, summary\: string\|null, \.\.\.\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AiConversation\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AiConversation\>\:\:map\(\) expects callable\(App\\Models\\AiConversation, int\)\: array\{id\: int, bot_id\: int\<0, max\>, bot_name\: mixed, bot_symbol\: mixed, status\: string, trigger\: string, model\: string\|null, summary\: string\|null, analysis\: string\|null, actions_taken\: array\|null, total_tokens\: int, total_tool_calls\: int, total_messages\: int\<0, max\>, duration_ms\: int, action_logs\: Illuminate\\Support\\Collection\<int, array\{action\: string, source\: string, details\: array\|null\}\>, started_at\: string\|null, ended_at\: string\|null\}, Closure\(App\\Models\\AiConversation\)\: array\{id\: int, bot_id\: int\<0, max\>, bot_name\: mixed, bot_symbol\: mixed, status\: string, trigger\: string, model\: string\|null, summary\: string\|null, analysis\: string\|null, actions_taken\: array\|null, total_tokens\: int, total_tool_calls\: int, total_messages\: int\<0, max\>, duration_ms\: int, action_logs\: Illuminate\\Support\\Collection\<int, array\{action\: string, source\: string, details\: array\|null\}\>, started_at\: string\|null, ended_at\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\BotActionLog\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{action\: string, source\: string, details\: array\|null\}, Closure\(App\\Models\\BotActionLog\)\: array\{action\: string, source\: string, details\: array\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int, action\: string, source\: string, details\: array\|null, before_state\: array\|null, after_state\: array\|null, created_at\: string\|null\}, Closure\(App\\Models\\BotActionLog\)\: array\{id\: int, action\: string, source\: string, details\: array\|null, before_state\: array\|null, after_state\: array\|null, created_at\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/AiAgentApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_testnet\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BotApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BotApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BotApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_testnet\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MarketApiController.php
+
+		-
+			message: '#^Property App\\Http\\Controllers\\Api\\MarketApiController\:\:\$futures is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Http/Controllers/Api/MarketApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$cancelled_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$filled_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$open_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$total_pnl\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$best\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$filled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$side\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$total\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$worst\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Order\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/OrderApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Bot\:\:\$open_orders_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatusApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$filled_24h\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatusApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$filled_orders\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatusApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$open_orders\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatusApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Order\:\:\$total_pnl\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatusApiController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_testnet\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatusApiController.php
+
+		-
+			message: '#^Parameter \#1 \$user of class Illuminate\\Auth\\Events\\Verified constructor expects Illuminate\\Contracts\\Auth\\MustVerifyEmail, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Auth/VerifyEmailController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_testnet\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_connected_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$masked_api_key\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:bots\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/BinanceAccountController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$api_key\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$api_secret\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$filled_at\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$masked_api_key\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$price\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$side\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceApiService\:\:getPositions\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 5
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Property App\\Http\\Controllers\\BotController\:\:\$botRepository is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Http/Controllers/BotController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\BotActionLog\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Order\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Bot\:\:\$filled_orders_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Bot\:\:\$open_orders_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Bot\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Loose comparison using \=\= between non\-falsy\-string&numeric\-string and 0 will always evaluate to false\.$#'
+			identifier: equal.alwaysFalse
+			count: 1
+			path: app/Models/Bot.php
+
+		-
+			message: '#^Parameter \#1 \$num of function number_format expects float, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Models/Bot.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/BotActionLog.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/BotActionLog.php
+
+		-
+			message: '#^Parameter \#2 \$replace of function str_replace expects array\<string\>\|string, array\<int, int\|string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Agent/AgentOrchestrator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$filled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$grid_level\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pnl\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$side\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceApiService\:\:getPositions\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:cancelAllOrders\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:placeMarketOrder\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Property App\\Services\\Agent\\AgentToolkit\:\:\$botService is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Services/Agent/AgentToolkit.php
+
+		-
+			message: '#^Call to function is_array\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\CurrentAllOpenOrdersResponse will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Call to function is_array\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\FuturesAccountBalanceV3Response will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Call to function is_array\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\PositionInformationV3Response will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Call to function is_array\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\SymbolPriceTickerV2Response will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\CurrentAllOpenOrdersResponse and ''getItems'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\FuturesAccountBalanceV3Response and ''getItems'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Binance\\Client\\DerivativesTradingUsdsFutures\\Model\\PositionInformationV3Response and ''getItems'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Variable \$data in empty\(\) is never defined\.$#'
+			identifier: empty.variable
+			count: 1
+			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$binance_order_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$grid_level\.$#'
+			identifier: property.notFound
+			count: 11
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$price\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$side\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Method App\\Services\\GridTradingEngine\:\:closePosition\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Offset ''avgPrice'' on array\{orderId\: int, status\: string, executedQty\: float, avgPrice\: float\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Offset ''executedQty'' on array\{orderId\: int, status\: string, executedQty\: float, avgPrice\: float\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:cancelAllOrders\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:getCurrentPrice\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:getCurrentPrice\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:getOpenOrders\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:getPositions\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:placeLimitOrder\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:placeLimitOrder\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:queryOrder\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:setLeverage\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php
+
+		-
+			message: '#^Parameter \#1 \$account of method App\\Services\\BinanceFuturesService\:\:setMarginType\(\) expects App\\Models\\BinanceAccount, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/GridTradingEngine.php

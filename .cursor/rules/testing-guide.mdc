@@ -1,0 +1,347 @@
+---
+description: Testing conventions - how to write and run tests for new features or updates
+globs: tests/**/*.php,database/factories/*.php
+alwaysApply: false
+---
+
+# Testing Guide
+
+## Run tests
+
+```bash
+php artisan test                        # full suite (165+ tests)
+php artisan test --filter ClassName     # single class
+php artisan test --stop-on-failure      # stop on first failure (used in deploy)
+```
+
+Tests use **SQLite in-memory** (configured in `phpunit.xml`). No Docker needed.
+
+---
+
+## Structure
+
+```
+tests/
+  Unit/          # pure logic, no HTTP — Services, Jobs, helpers
+  Feature/       # HTTP requests via actingAs() — Web controllers
+  Feature/Api/   # JSON endpoints — API controllers (X-API-Key auth)
+
+database/factories/  # Eloquent factories for every model
+```
+
+---
+
+## Unit test (Service / pure logic)
+
+Use `Tests\TestCase` + `RefreshDatabase` when DB is needed.
+Mock external dependencies with `$this->createMock()`.
+
+```php
+class MyServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_it_does_something(): void
+    {
+        $dep = $this->createMock(ExternalService::class);
+        $dep->expects($this->once())->method('call')->willReturn('ok');
+
+        $service = new MyService($dep);
+        $result  = $service->doSomething();
+
+        $this->assertEquals('ok', $result);
+    }
+}
+```
+
+---
+
+## Testing Jobs (Queue)
+
+Use `Queue::fake()` to intercept dispatches without actually running them.
+
+```php
+use Illuminate\Support\Facades\Queue;
+use App\Jobs\MyJob;
+
+public function test_action_dispatches_job(): void
+{
+    Queue::fake();
+
+    // trigger the action that dispatches the job
+    $service->doSomething();
+
+    Queue::assertPushed(MyJob::class);
+    Queue::assertNotPushed(OtherJob::class);
+
+    // Assert with constraints on the job
+    Queue::assertPushed(MyJob::class, function ($job) use ($bot) {
+        return in_array('bot:' . $bot->id, $job->tags());
+    });
+}
+```
+
+**ShouldBeUnique jobs**: `Queue::fake()` bypasses the uniqueness lock, so duplicate-dispatch tests work normally in tests.
+
+---
+
+## Testing GridTradingEngine with mocked Binance
+
+`GridTradingEngine` requires `BinanceFuturesService` which calls external APIs.
+Minimal mock setup: create a bot with **no orders** so `syncOrderStatuses` and
+`handleFilledOrders` return early. Only `getPositions` (for `updateBotStats`) and
+`getCurrentPrice` (for `checkStopConditions`) need stubbing.
+
+```php
+use App\Services\BinanceFuturesService;
+use App\Services\GridTradingEngine;
+use App\Repositories\BotRepository;
+use App\Repositories\OrderRepository;
+use App\Services\GridCalculatorService;
+
+class MyEngineTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private GridTradingEngine $engine;
+    private BinanceFuturesService $binanceMock;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->binanceMock = $this->createMock(BinanceFuturesService::class);
+        $this->binanceMock->method('getPositions')->willReturn([]);  // for updateBotStats
+
+        $this->engine = new GridTradingEngine(
+            $this->binanceMock,
+            app(BotRepository::class),
+            app(OrderRepository::class),
+            app(GridCalculatorService::class),
+        );
+    }
+
+    public function test_something_when_price_hits_condition(): void
+    {
+        Queue::fake();
+
+        $bot = Bot::factory()->active()->create(['stop_loss_price' => 79000.0]);
+        $this->binanceMock->method('getCurrentPrice')->willReturn(78000.0);
+
+        $this->engine->processBot($bot);
+
+        Queue::assertPushed(RunAgentAlertJob::class);
+        $bot->refresh();
+        $this->assertEquals(BotStatus::Active, $bot->status); // not stopped!
+    }
+}
+```
+
+**Key**: bot with no orders = `syncOrderStatuses` returns early (no `binance_order_id`),
+`handleFilledOrders` returns early (no filled orders), `autoRebuildIfEmpty` returns early
+(no filled orders). Only `getPositions` and `getCurrentPrice` need mocking.
+
+---
+
+## Verifying BotActionLog entries
+
+When testing actions that should create audit trail entries:
+
+```php
+$this->assertDatabaseHas('bot_action_logs', [
+    'bot_id' => $bot->id,
+    'action' => 'bot_sl_tp_alert',
+    'source' => 'system',
+]);
+
+// Check details JSON
+$log = BotActionLog::where('bot_id', $bot->id)
+    ->where('action', 'bot_sl_tp_alert')
+    ->firstOrFail();
+
+$this->assertEquals('stop_loss', $log->details['trigger']);
+$this->assertEquals(78000.0, $log->details['current_price']);
+```
+
+Source values: `user` | `api` | `agent` | `system`
+
+---
+
+## Spy pattern — assert a method is NEVER called
+
+Use `getMockBuilder()->onlyMethods()` to create a spy that verifies a method
+is not invoked (useful to guard against regressions like "stopBot never called directly"):
+
+```php
+$spy = $this->getMockBuilder(GridTradingEngine::class)
+    ->setConstructorArgs([
+        $this->binanceMock,
+        app(BotRepository::class),
+        app(OrderRepository::class),
+        app(GridCalculatorService::class),
+    ])
+    ->onlyMethods(['stopBot'])
+    ->getMock();
+
+$spy->expects($this->never())->method('stopBot');
+
+$spy->processBot($bot); // if stopBot is called internally, test fails
+```
+
+---
+
+## Agent trigger testing
+
+The agent has three trigger modes with different permissions:
+
+| Trigger | `stop_bot` allowed | When used |
+|---|---|---|
+| `scheduled` | ❌ blocked | `RunAgentConsultationJob` every 5 min |
+| `manual` | ✅ allowed | User clicks "Consultar Agente" |
+| `sl_tp_alert` | ✅ allowed | `RunAgentAlertJob` on SL/TP price hit |
+
+When testing agent behavior, pass the trigger to `AgentOrchestrator::consult($bot, $trigger, $alertContext)`.
+
+---
+
+## Feature test — Web controller
+
+Use `actingAs($user)`. Bots and accounts require ownership checks (403).
+
+```php
+class MyControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_index_renders_page(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+             ->get(route('my-route'))
+             ->assertInertia(fn ($p) => $p->component('MyPage'));
+    }
+
+    public function test_other_user_is_forbidden(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $bot   = Bot::factory()->create(['user_id' => $owner->id]);
+
+        $this->actingAs($other)
+             ->get(route('bots.show', $bot))
+             ->assertForbidden();
+    }
+}
+```
+
+---
+
+## Feature test — API controller
+
+Auth via `X-API-Key` header (auto-generated on `User::factory()->create()`).
+
+```php
+class MyApiControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function headers(User $user): array
+    {
+        return ['X-API-Key' => $user->api_key];
+    }
+
+    public function test_requires_api_key(): void
+    {
+        $this->getJson('/api/v1/my-endpoint')->assertUnauthorized();
+    }
+
+    public function test_returns_data(): void
+    {
+        $user = User::factory()->create();
+
+        $this->getJson('/api/v1/my-endpoint', $this->headers($user))
+             ->assertOk()
+             ->assertJsonStructure(['data' => ['field']]);
+    }
+}
+```
+
+---
+
+## Factories
+
+Every new model needs a factory in `database/factories/`. The model must `use HasFactory`.
+
+```php
+class MyModelFactory extends Factory
+{
+    public function definition(): array
+    {
+        return [
+            'user_id' => User::factory(),
+            'name'    => fake()->word(),
+            'status'  => 'active',
+        ];
+    }
+
+    // Named states for common scenarios
+    public function inactive(): static
+    {
+        return $this->state(['status' => 'inactive']);
+    }
+}
+```
+
+**Bot factory states available**: `active()`, `stopped()`, `withLeverage(int)`.
+
+---
+
+## Manual testing in localhost (Docker)
+
+For testing agent flows end-to-end in local environment:
+
+```bash
+# Simulate SL/TP alert → agent consultation (synchronous, shows result)
+docker compose exec laravel.test php artisan bot:test-alert {botId}
+docker compose exec laravel.test php artisan bot:test-alert {botId} --type=tp
+
+# Run the scheduler manually
+docker compose exec laravel.test php artisan schedule:run
+
+# Dispatch all active bot processing jobs manually
+docker compose exec laravel.test php artisan queue:work --once
+```
+
+After running `bot:test-alert`, view the conversation at `/ai-agent/conversations/{id}`.
+
+---
+
+## Checklist for new feature / update
+
+- [ ] New Service method → Unit test covering happy path + edge cases
+- [ ] New web route → Feature test: auth required, 403 for other users, success case
+- [ ] New API endpoint → Feature/Api test: 401 without key, 403 on ownership, 200 success
+- [ ] New model → factory with `use HasFactory` on the model
+- [ ] Job that dispatches conditionally → `Queue::fake()` + `assertPushed`/`assertNotPushed`
+- [ ] Action that logs to `bot_action_logs` → `assertDatabaseHas('bot_action_logs', [...])`
+- [ ] Critical guard (e.g. "never call stopBot directly") → spy test with `expects($this->never())`
+- [ ] Agent behavior change → test with correct trigger (`scheduled`/`manual`/`sl_tp_alert`)
+- [ ] Run `composer stan` — PHPStan must return `[OK] No errors`
+- [ ] Run `php artisan test` — all tests must pass before committing
+
+## PHPStan (static analysis)
+
+```bash
+composer stan          # ./vendor/bin/phpstan analyse --memory-limit=512M
+composer lint          # ./vendor/bin/pint --test  (code style)
+composer check         # stan + lint + tests together
+```
+
+If a new `selectRaw` / `withCount` pattern produces `property.notFound` that's a framework-dynamic false positive (not a real bug), update the baseline:
+
+```bash
+./vendor/bin/phpstan analyse --memory-limit=512M --generate-baseline=phpstan-baseline.neon
+```
+
+Do NOT add `@phpstan-ignore` to silence real type errors — fix the code.

@@ -7,7 +7,19 @@ alwaysApply: true
 
 When asked to deploy, commit, or push to production, follow this sequence:
 
-## 1. Run tests
+## 1. Static analysis (PHPStan)
+
+```bash
+./vendor/bin/phpstan analyse --memory-limit=512M
+```
+
+Must return `[OK] No errors`. If it fails, fix the code — do NOT add `@phpstan-ignore` comments, do NOT widen types, do NOT use `assert()`. Fix the root cause. If the error is a false positive from a Laravel dynamic pattern (selectRaw, withCount), update the baseline:
+
+```bash
+./vendor/bin/phpstan analyse --memory-limit=512M --generate-baseline=phpstan-baseline.neon
+```
+
+## 2. Run tests
 
 ```bash
 php artisan test --stop-on-failure
@@ -15,7 +27,7 @@ php artisan test --stop-on-failure
 
 If any test fails, **stop immediately** — do NOT continue with build or push. Fix the failing tests first.
 
-## 2. Build check
+## 3. Build check
 
 ```bash
 npm run build
@@ -23,20 +35,20 @@ npm run build
 
 If it fails, fix errors before continuing.
 
-## 3. Commit
+## 4. Commit
 
 ```bash
 git add <changed-files>
 git commit -m "<concise message>"
 ```
 
-## 4. Push
+## 5. Push
 
 ```bash
 git push origin main
 ```
 
-## 5. Trigger Dokploy deploy
+## 6. Trigger Dokploy deploy
 
 ```bash
 curl -s -X POST "http://wizardgpt.tail100e88.ts.net:3000/api/deploy/compose/LsajeN9Wk6UlNWtctcJ40" \
