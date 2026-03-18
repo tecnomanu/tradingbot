@@ -7,7 +7,15 @@ alwaysApply: true
 
 When asked to deploy, commit, or push to production, follow this sequence:
 
-## 1. Build check
+## 1. Run tests
+
+```bash
+php artisan test --stop-on-failure
+```
+
+If any test fails, **stop immediately** — do NOT continue with build or push. Fix the failing tests first.
+
+## 2. Build check
 
 ```bash
 npm run build
@@ -15,20 +23,20 @@ npm run build
 
 If it fails, fix errors before continuing.
 
-## 2. Commit
+## 3. Commit
 
 ```bash
 git add <changed-files>
 git commit -m "<concise message>"
 ```
 
-## 3. Push
+## 4. Push
 
 ```bash
 git push origin main
 ```
 
-## 4. Trigger Dokploy deploy
+## 5. Trigger Dokploy deploy
 
 ```bash
 curl -s -X POST "http://wizardgpt.tail100e88.ts.net:3000/api/deploy/compose/LsajeN9Wk6UlNWtctcJ40" \
