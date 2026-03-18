@@ -116,6 +116,7 @@ const actionLabels: Record<string, string> = {
     bot_created: "Bot creado",
     bot_started: "Bot iniciado",
     bot_stopped: "Bot detenido",
+    bot_sl_tp_alert: "Alerta SL/TP",
     bot_stop_blocked: "Stop bloqueado (auto)",
     bot_updated: "Bot actualizado",
     bot_deleted: "Bot eliminado",
@@ -132,6 +133,7 @@ const actionLabels: Record<string, string> = {
 const actionColors: Record<string, string> = {
     bot_started: "text-emerald-400",
     bot_stopped: "text-red-400",
+    bot_sl_tp_alert: "text-orange-400",
     bot_stop_blocked: "text-amber-400",
     bot_created: "text-blue-400",
     bot_updated: "text-sky-400",

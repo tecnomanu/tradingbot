@@ -26,7 +26,7 @@ class AgentOrchestrator
         $this->apiKey = config('services.ai.key') ?: '';
     }
 
-    public function consult(Bot $bot, string $trigger = 'scheduled'): AiConversation
+    public function consult(Bot $bot, string $trigger = 'scheduled', ?string $alertContext = null): AiConversation
     {
         $startTime = microtime(true);
 
@@ -42,7 +42,7 @@ class AgentOrchestrator
         $this->toolkit->setTrigger($trigger);
 
         try {
-            $messages = $this->buildInitialMessages($bot, $trigger);
+            $messages = $this->buildInitialMessages($bot, $trigger, $alertContext);
             $this->storeMessages($conversation, $messages);
 
             $result = $this->runAgentLoop($conversation, $bot, $messages);
@@ -88,7 +88,7 @@ class AgentOrchestrator
         return $conversation;
     }
 
-    private function buildInitialMessages(Bot $bot, string $trigger = 'scheduled'): array
+    private function buildInitialMessages(Bot $bot, string $trigger = 'scheduled', ?string $alertContext = null): array
     {
         $personality = $bot->ai_system_prompt ?: static::defaultPersonality();
         $systemPrompt = $personality . "\n\n" . static::operationalPrompt();
@@ -101,6 +101,11 @@ class AgentOrchestrator
             $bot->ai_user_prompt ?: static::defaultUserPrompt(),
             $bot,
         );
+
+        // Prepend alert context so the agent immediately knows why it was called
+        if ($alertContext) {
+            $userPrompt = "⚠ ALERT — {$alertContext}\n\n" . $userPrompt;
+        }
 
         return [
             ['role' => 'system', 'content' => $systemPrompt],

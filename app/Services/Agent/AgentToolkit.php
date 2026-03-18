@@ -353,9 +353,9 @@ class AgentToolkit
     {
         $reason = $args['reason'] ?? 'Agent decision';
 
-        // In scheduled runs, blocking stop_bot prevents the self-defeating loop:
+        // In scheduled (routine) runs, blocking stop_bot prevents the self-defeating loop:
         // bot stops → agent stops running → bot stays stopped forever with no recovery.
-        // Only manual consultations (user-triggered) are allowed to stop the bot.
+        // Manual consultations and alert consultations (sl_tp_alert) are allowed to stop.
         if ($this->trigger === 'scheduled') {
             $this->logAction($bot, 'bot_stop_blocked', 'agent', [
                 'reason' => $reason,

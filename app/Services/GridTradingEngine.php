@@ -8,6 +8,7 @@ use App\Enums\OrderSide;
 use App\Enums\OrderStatus;
 use App\Models\Bot;
 use App\Models\Order;
+use App\Jobs\RunAgentAlertJob;
 use App\Repositories\BotRepository;
 use App\Repositories\OrderRepository;
 use App\Services\BotActivityLogger;
@@ -276,28 +277,30 @@ class GridTradingEngine
         }
 
         if ($triggered) {
-            Log::warning("GridEngine: {$triggered} triggered", [
+            Log::warning("GridEngine: {$triggered} triggered — dispatching agent alert instead of hard stop", [
                 'bot_id' => $bot->id,
                 'current_price' => $currentPrice,
                 'sl' => $bot->stop_loss_price,
                 'tp' => $bot->take_profit_price,
             ]);
 
-            BotActivityLogger::logSystemAction($bot, 'bot_stopped', [
-                'reason' => $triggered === 'stop_loss' ? 'Stop Loss activado' : 'Take Profit activado',
+            // Log the alert so it's visible in the bot historial
+            BotActivityLogger::logSystemAction($bot, 'bot_sl_tp_alert', [
+                'trigger' => $triggered,
                 'current_price' => $currentPrice,
                 'stop_loss_price' => $bot->stop_loss_price,
                 'take_profit_price' => $bot->take_profit_price,
             ]);
 
-            $this->stopBot($bot);
+            // Instead of stopping directly, fire an agent consultation with full context.
+            // The agent will decide: close_position, adjust_grid, tighten SL, or stop_bot.
+            // This ensures: audit trail, Telegram notification per config, and a chance to
+            // recover the position instead of a blind hard stop.
+            $alertContext = $triggered === 'stop_loss'
+                ? "CRITICAL: Stop-Loss price reached. Current price: {$currentPrice}, SL: {$bot->stop_loss_price}. Immediate action required: check position, consider close_position + adjust_grid or stop_bot."
+                : "CRITICAL: Take-Profit price reached. Current price: {$currentPrice}, TP: {$bot->take_profit_price}. Immediate action required: close_position to realize profits, then adjust_grid or stop_bot.";
 
-            $positions = $this->binance->getPositions($account, $bot->symbol);
-            foreach ($positions as $pos) {
-                if (abs($pos['positionAmt']) > 0) {
-                    $this->closePosition($account, $bot->symbol, $pos['positionAmt']);
-                }
-            }
+            RunAgentAlertJob::dispatch($bot, 'sl_tp_alert', $alertContext);
         }
     }
 
