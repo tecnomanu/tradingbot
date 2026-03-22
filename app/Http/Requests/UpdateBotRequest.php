@@ -24,7 +24,8 @@ class UpdateBotRequest extends FormRequest
             'slippage'          => 'nullable|numeric|min:0|max:5',
             'stop_loss_price'   => 'nullable|numeric|min:0',
             'take_profit_price' => 'nullable|numeric|min:0',
-            'grid_mode'         => 'nullable|string|in:arithmetic,geometric',
+            'grid_mode'                => 'nullable|string|in:arithmetic,geometric',
+            'ai_consultation_interval' => 'sometimes|integer|min:0|max:60',
         ];
     }
 }
