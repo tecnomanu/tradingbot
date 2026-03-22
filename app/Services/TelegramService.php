@@ -94,11 +94,15 @@ class TelegramService
         if (!empty($actions)) {
             $actionLabels = [
                 'grid_adjusted' => '🔄 Grid ajustado',
-                'stop_loss_set' => '🛡 Stop Loss configurado',
-                'take_profit_set' => '🎯 Take Profit configurado',
+                'sl_set' => '🛡 Stop-Loss configurado',
+                'tp_set' => '🎯 Take-Profit configurado',
+                'stop_loss_set' => '🛡 Stop-Loss configurado',
+                'take_profit_set' => '🎯 Take-Profit configurado',
                 'bot_stopped' => '🛑 Bot detenido',
                 'position_closed' => '💰 Posición cerrada',
                 'orders_cancelled' => '❌ Órdenes canceladas',
+                'risk_guard_triggered' => '🚨 Risk Guard disparado',
+                'price_out_of_range' => '⚠️ Precio fuera de rango',
             ];
 
             $lines[] = '<b>Acciones:</b>';

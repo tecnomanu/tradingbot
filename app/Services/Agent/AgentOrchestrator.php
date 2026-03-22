@@ -540,7 +540,7 @@ PROMPT;
             return;
         }
 
-        $allowedEvents = $bot->ai_notify_events ?? ['grid_adjusted', 'bot_stopped', 'stop_loss_set', 'position_closed'];
+        $allowedEvents = $bot->ai_notify_events ?? ['grid_adjusted', 'bot_stopped', 'sl_set', 'tp_set', 'position_closed', 'stop_loss_set'];
         $matchingActions = array_intersect($actions, $allowedEvents);
 
         if (empty($matchingActions)) {

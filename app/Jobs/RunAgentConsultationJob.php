@@ -60,7 +60,12 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 
     private function shouldConsult(Bot $bot): bool
     {
-        $intervalMinutes = $bot->ai_consultation_interval ?: 15;
+        $intervalMinutes = (int) $bot->ai_consultation_interval;
+
+        // 0 or no prompt = agent disabled for this bot
+        if ($intervalMinutes <= 0 || empty($bot->ai_system_prompt)) {
+            return false;
+        }
 
         $lastSuccess = AiConversation::where('bot_id', $bot->id)
             ->where('status', 'completed')
