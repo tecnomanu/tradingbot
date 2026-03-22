@@ -9,6 +9,11 @@ use App\Models\User;
 
 class BotActivityLogger
 {
+    public const RESULT_SUCCESS = 'success';
+    public const RESULT_FAILED = 'failed';
+    public const RESULT_PARTIAL = 'partial';
+    public const RESULT_BLOCKED = 'blocked';
+
     public static function log(
         Bot $bot,
         string $action,
@@ -18,6 +23,8 @@ class BotActivityLogger
         ?array $beforeState = null,
         ?array $afterState = null,
         ?int $conversationId = null,
+        string $result = self::RESULT_SUCCESS,
+        ?string $errorMessage = null,
     ): BotActionLog {
         return BotActionLog::create([
             'bot_id' => $bot->id,
@@ -28,27 +35,60 @@ class BotActivityLogger
             'details' => $details ?: null,
             'before_state' => $beforeState,
             'after_state' => $afterState,
+            'result' => $result,
+            'error_message' => $errorMessage,
         ]);
     }
 
-    public static function logUserAction(Bot $bot, string $action, User $user, array $details = [], ?array $beforeState = null, ?array $afterState = null): BotActionLog
-    {
-        return self::log($bot, $action, ActionSource::User, $user, $details, $beforeState, $afterState);
+    public static function logUserAction(
+        Bot $bot,
+        string $action,
+        User $user,
+        array $details = [],
+        ?array $beforeState = null,
+        ?array $afterState = null,
+        string $result = self::RESULT_SUCCESS,
+        ?string $errorMessage = null,
+    ): BotActionLog {
+        return self::log($bot, $action, ActionSource::User, $user, $details, $beforeState, $afterState, null, $result, $errorMessage);
     }
 
-    public static function logApiAction(Bot $bot, string $action, User $user, array $details = [], ?array $beforeState = null, ?array $afterState = null): BotActionLog
-    {
-        return self::log($bot, $action, ActionSource::Api, $user, $details, $beforeState, $afterState);
+    public static function logApiAction(
+        Bot $bot,
+        string $action,
+        User $user,
+        array $details = [],
+        ?array $beforeState = null,
+        ?array $afterState = null,
+        string $result = self::RESULT_SUCCESS,
+        ?string $errorMessage = null,
+    ): BotActionLog {
+        return self::log($bot, $action, ActionSource::Api, $user, $details, $beforeState, $afterState, null, $result, $errorMessage);
     }
 
-    public static function logAgentAction(Bot $bot, string $action, array $details = [], ?int $conversationId = null): BotActionLog
-    {
-        return self::log($bot, $action, ActionSource::Agent, null, $details, null, null, $conversationId);
+    public static function logAgentAction(
+        Bot $bot,
+        string $action,
+        array $details = [],
+        ?int $conversationId = null,
+        ?array $beforeState = null,
+        ?array $afterState = null,
+        string $result = self::RESULT_SUCCESS,
+        ?string $errorMessage = null,
+    ): BotActionLog {
+        return self::log($bot, $action, ActionSource::Agent, null, $details, $beforeState, $afterState, $conversationId, $result, $errorMessage);
     }
 
-    public static function logSystemAction(Bot $bot, string $action, array $details = []): BotActionLog
-    {
-        return self::log($bot, $action, ActionSource::System, null, $details);
+    public static function logSystemAction(
+        Bot $bot,
+        string $action,
+        array $details = [],
+        ?array $beforeState = null,
+        ?array $afterState = null,
+        string $result = self::RESULT_SUCCESS,
+        ?string $errorMessage = null,
+    ): BotActionLog {
+        return self::log($bot, $action, ActionSource::System, null, $details, $beforeState, $afterState, null, $result, $errorMessage);
     }
 
     public static function captureState(Bot $bot): array

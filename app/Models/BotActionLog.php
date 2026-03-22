@@ -10,7 +10,7 @@ class BotActionLog extends Model
 {
     protected $fillable = [
         'bot_id', 'user_id', 'conversation_id', 'action', 'source',
-        'details', 'before_state', 'after_state',
+        'details', 'before_state', 'after_state', 'result', 'error_message',
     ];
 
     protected $casts = [

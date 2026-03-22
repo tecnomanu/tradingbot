@@ -15,7 +15,21 @@ export const actionLabels: Record<string, string> = {
     order_cancelled: "Orden cancelada",
     position_closed: "Posición cerrada",
     grid_adjusted: "Grid ajustado",
+    risk_guard_triggered: "Risk Guard disparado",
+    exchange_error: "Error de exchange",
+    price_out_of_range: "Precio fuera de rango",
     leverage_changed: "Apalancamiento cambiado",
+};
+
+export const gridAdjustReasons: Record<string, string> = {
+    all_orders_filled: "Todas las órdenes ejecutadas (auto-rebuild)",
+    price_outside_range: "Precio fuera del rango",
+    volatility_shift: "Cambio de volatilidad",
+    trend_change: "Cambio de tendencia",
+    manual_action: "Ajuste manual del usuario",
+    protection_mode: "Modo protección",
+    bot_recovery: "Recuperación del bot",
+    unknown: "Sin motivo especificado",
 };
 
 export const actionColors: Record<string, string> = {
@@ -30,6 +44,9 @@ export const actionColors: Record<string, string> = {
     orders_cancelled: "text-orange-400",
     position_closed: "text-red-400",
     grid_adjusted: "text-blue-400",
+    risk_guard_triggered: "text-red-500",
+    exchange_error: "text-red-400",
+    price_out_of_range: "text-orange-400",
     leverage_changed: "text-purple-400",
 };
 
@@ -51,6 +68,15 @@ export function getActionColor(action: string): string {
 
 export function formatActionDetails(action: string, details: Record<string, any> | null): string {
     if (!details) return "";
+
+    if (action === "grid_adjusted") {
+        return formatGridAdjustedDetails(details);
+    }
+
+    if (action === "price_out_of_range") {
+        return formatPriceOutOfRangeDetails(details);
+    }
+
     const parts: string[] = [];
     if (details.reason) parts.push(details.reason);
     if (details.price !== undefined)
@@ -73,6 +99,42 @@ export function formatActionDetails(action: string, details: Record<string, any>
         .filter(([, v]) => v !== null && v !== undefined)
         .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`);
     return filtered.join(", ");
+}
+
+function formatGridAdjustedDetails(details: Record<string, any>): string {
+    const parts: string[] = [];
+    const reasonKey = details.reason ?? details.reason_label ?? null;
+    if (reasonKey) {
+        const label = gridAdjustReasons[reasonKey] ?? reasonKey;
+        parts.push(`Motivo: ${label}`);
+    }
+    if (details.old_range && details.new_range) {
+        parts.push(`${details.old_range} → ${details.new_range}`);
+    }
+    if (details.current_price !== undefined) {
+        parts.push(`Precio: $${Number(details.current_price).toLocaleString()}`);
+    }
+    if (details.orders_placed !== undefined) {
+        parts.push(`${details.orders_placed} órdenes colocadas`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : "Grid ajustado";
+}
+
+const oorReasons: Record<string, string> = {
+    price_deviation_minor: "Desviación menor",
+    sustained_breakout: "Ruptura sostenida",
+    price_breakout_protection: "Protección por ruptura",
+};
+
+function formatPriceOutOfRangeDetails(details: Record<string, any>): string {
+    const parts: string[] = [];
+    if (details.reason) parts.push(oorReasons[details.reason] ?? details.reason);
+    const dir = details.direction === "below" ? "↓ debajo" : "↑ encima";
+    if (details.deviation_pct !== undefined) parts.push(`${dir} ${details.deviation_pct}%`);
+    if (details.price !== undefined) parts.push(`$${Number(details.price).toLocaleString()}`);
+    if (details.action_taken && details.action_taken !== "none") parts.push(`→ ${details.action_taken}`);
+    if (details.streak !== undefined) parts.push(`${details.streak} min`);
+    return parts.join(" · ");
 }
 
 export function formatActionsTaken(actions: string[]): string {

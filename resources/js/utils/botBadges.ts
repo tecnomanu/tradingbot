@@ -56,3 +56,22 @@ export function leverageClass(size: BadgeSize = "xs") {
 export function leverageLabel(leverage: number | string) {
     return `${leverage}x`;
 }
+
+// --- Margin Type ---
+
+export function marginTypeLabel(marginType: string | null | undefined): string {
+    if (!marginType) return "—";
+    const lower = marginType.toLowerCase();
+    if (lower === "cross" || lower === "crossed") return "Cross";
+    if (lower === "isolated") return "Isolated";
+    return marginType;
+}
+
+export function marginTypeBadgeClass(marginType: string | null | undefined, size: BadgeSize = "xs") {
+    const lower = (marginType ?? "").toLowerCase();
+    const isIsolated = lower === "isolated";
+    const colors = isIsolated
+        ? "bg-orange-500/15 text-orange-500"
+        : "bg-purple-500/15 text-purple-500";
+    return cn(BASE, SIZE_CLASSES[size], colors);
+}

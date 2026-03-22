@@ -169,12 +169,6 @@ parameters:
 			path: app/Http/Controllers/Api/MarketApiController.php
 
 		-
-			message: '#^Property App\\Http\\Controllers\\Api\\MarketApiController\:\:\$futures is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Http/Controllers/Api/MarketApiController.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Order\:\:\$cancelled_count\.$#'
 			identifier: property.notFound
 			count: 1
@@ -217,18 +211,6 @@ parameters:
 			path: app/Http/Controllers/Api/OrderApiController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/OrderApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/OrderApiController.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$price\.$#'
 			identifier: property.notFound
 			count: 1
@@ -236,12 +218,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$side\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/OrderApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/OrderApiController.php
@@ -255,12 +231,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$worst\.$#'
 			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/OrderApiController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Order\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
 			count: 1
 			path: app/Http/Controllers/Api/OrderApiController.php
 
@@ -457,24 +427,6 @@ parameters:
 			path: app/Http/Controllers/BotController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/DashboardController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\BotActionLog\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/DashboardController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Order\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/DashboardController.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Bot\:\:\$filled_orders_count\.$#'
 			identifier: property.notFound
 			count: 1
@@ -491,6 +443,234 @@ parameters:
 			identifier: argument.unresolvableType
 			count: 1
 			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$binanceAccount\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$est_liquidation_price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$grid_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$grid_profit\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$investment\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$leverage\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$orders\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$pnl_percentage\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$price_lower\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$price_upper\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$profit_per_grid\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$real_investment\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$rounds_24h\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$side\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$started_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$stop_loss_price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$stopped_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$symbol\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$take_profit_price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$total_pnl\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$total_rounds\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$trend_pnl\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\BotSummaryResource\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/BotSummaryResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$binance_order_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$bot\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$filled_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$grid_level\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$pnl\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$price\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$quantity\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$side\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
+
+		-
+			message: '#^Access to an undefined property App\\Http\\Resources\\OrderResource\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Resources/OrderResource.php
 
 		-
 			message: '#^Loose comparison using \=\= between non\-falsy\-string&numeric\-string and 0 will always evaluate to false\.$#'
@@ -635,6 +815,24 @@ parameters:
 			identifier: empty.variable
 			count: 1
 			path: app/Services/BinanceFuturesService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$symbol\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/DashboardService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\BotActionLog\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/DashboardService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Order\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/DashboardService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$binance_order_id\.$#'

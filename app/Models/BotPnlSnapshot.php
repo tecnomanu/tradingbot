@@ -13,6 +13,7 @@ class BotPnlSnapshot extends Model
         'bot_id',
         'total_pnl',
         'grid_profit',
+        'total_fees',
         'trend_pnl',
         'unrealized_pnl',
         'snapshot_at',
@@ -21,6 +22,7 @@ class BotPnlSnapshot extends Model
     protected $casts = [
         'total_pnl' => 'decimal:4',
         'grid_profit' => 'decimal:4',
+        'total_fees' => 'decimal:4',
         'trend_pnl' => 'decimal:4',
         'unrealized_pnl' => 'decimal:4',
         'snapshot_at' => 'datetime',

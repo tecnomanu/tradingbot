@@ -24,6 +24,7 @@ export interface Bot {
     grid_mode?: string;
     investment: number;
     leverage: number;
+    margin_type: string | null;
     slippage: number;
     real_investment: number;
     additional_margin: number;
@@ -32,6 +33,7 @@ export interface Bot {
     commission_per_grid: number;
     total_pnl: number;
     grid_profit: number;
+    total_fees: number;
     trend_pnl: number;
     total_rounds: number;
     rounds_24h: number;
@@ -42,6 +44,9 @@ export interface Bot {
     ai_consultation_interval: number;
     ai_notify_telegram: boolean;
     ai_notify_events: string[] | null;
+    risk_config: RiskConfig | null;
+    risk_guard_reason: string | null;
+    risk_guard_triggered_at: string | null;
     started_at: string | null;
     stopped_at: string | null;
     created_at: string;
@@ -66,6 +71,7 @@ export interface Order {
     quantity: number;
     grid_level: number;
     pnl: number | null;
+    fee: number | null;
     binance_order_id: string | null;
     filled_at: string | null;
     created_at: string;
@@ -76,6 +82,32 @@ export interface BotPnlSnapshot {
     total_pnl: number;
     grid_profit: number;
     trend_pnl?: number;
+}
+
+export interface DrawdownMetrics {
+    peak_pnl: number;
+    current_pnl: number;
+    max_drawdown: number;
+    max_drawdown_pct: number;
+    drawdown_duration_minutes: number | null;
+    snapshots_used: number;
+    data_since: string | null;
+}
+
+export interface RiskConfig {
+    max_drawdown_pct?: number;
+    min_liquidation_distance_pct?: number;
+    max_price_out_of_range_pct?: number;
+    max_consecutive_errors?: number;
+    max_grid_rebuilds_per_hour?: number;
+    emergency_stop?: boolean;
+}
+
+export interface RiskGuardStatus {
+    effective_config: RiskConfig;
+    is_triggered: boolean;
+    reason: string | null;
+    triggered_at: string | null;
 }
 
 export interface DashboardStats {
@@ -104,6 +136,7 @@ export interface RecentFill {
     price: number;
     quantity: number;
     pnl: number;
+    fee: number | null;
     filled_at: string | null;
     filled_at_fmt: string;
 }
@@ -134,6 +167,26 @@ export type BotStatus = "active" | "stopped" | "error" | "pending";
 export type BotSide = "long" | "short" | "neutral";
 export type OrderSide = "buy" | "sell";
 export type OrderStatus = "open" | "filled" | "cancelled" | "partially_filled";
+
+export interface AgentImpactBucket {
+    pnl: number;
+    hours: number;
+    pnl_per_hour: number;
+    intervals: number;
+}
+
+export interface AgentImpact {
+    agent: AgentImpactBucket;
+    system: AgentImpactBucket;
+    agent_actions: { total: number; by_type: Record<string, number> };
+    agent_actions_success: number;
+    agent_actions_failed: number;
+    runtime_hours: number;
+    agent_coverage_pct: number;
+    snapshots_used: number;
+    data_since: string | null;
+    influence_window_min: number;
+}
 
 export interface ApiResponse<T = unknown> {
     success: boolean;

@@ -90,9 +90,12 @@ class BotApiController extends Controller
             return $this->errorResponse('Bot is already active', 409);
         }
 
+        $beforeState = BotActivityLogger::captureState($bot);
         $this->botService->startBot($bot);
 
-        BotActivityLogger::logApiAction($bot, 'bot_started', $request->user());
+        BotActivityLogger::logApiAction($bot, 'bot_started', $request->user(), [
+            'reason' => 'api_request',
+        ], $beforeState);
 
         return $this->successResponse(
             ['bot_id' => $bot->id, 'status' => 'pending'],
@@ -111,10 +114,13 @@ class BotApiController extends Controller
             return $this->errorResponse('Bot is not active', 409);
         }
 
+        $beforeState = BotActivityLogger::captureState($bot);
         $this->botService->stopBot($bot);
         $bot->refresh();
 
-        BotActivityLogger::logApiAction($bot, 'bot_stopped', $request->user());
+        BotActivityLogger::logApiAction($bot, 'bot_stopped', $request->user(), [
+            'reason' => 'api_request',
+        ], $beforeState, BotActivityLogger::captureState($bot));
 
         return $this->successResponse(
             ['bot_id' => $bot->id, 'status' => $bot->status->value],

@@ -39,11 +39,15 @@ class GridTradingEngineSlTpAlertTest extends TestCase
         // getPositions is called by updateBotStats — return empty to avoid Binance calls
         $this->binanceMock->method('getPositions')->willReturn([]);
 
+        // Register mock in container so RiskGuardService also uses it
+        $this->app->instance(BinanceFuturesService::class, $this->binanceMock);
+
         $this->engine = new GridTradingEngine(
             $this->binanceMock,
             app(BotRepository::class),
             app(OrderRepository::class),
             app(GridCalculatorService::class),
+            app(\App\Services\RiskGuardService::class),
         );
     }
 
@@ -235,6 +239,7 @@ class GridTradingEngineSlTpAlertTest extends TestCase
                 app(BotRepository::class),
                 app(OrderRepository::class),
                 app(GridCalculatorService::class),
+                app(\App\Services\RiskGuardService::class),
             ])
             ->onlyMethods(['stopBot'])
             ->getMock();

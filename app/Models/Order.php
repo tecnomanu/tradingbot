@@ -19,6 +19,7 @@ class Order extends Model
         'quantity',
         'grid_level',
         'pnl',
+        'fee',
         'binance_order_id',
         'filled_at',
     ];
@@ -30,6 +31,7 @@ class Order extends Model
         'quantity' => 'decimal:8',
         'grid_level' => 'integer',
         'pnl' => 'decimal:4',
+        'fee' => 'decimal:4',
         'filled_at' => 'datetime',
     ];
 

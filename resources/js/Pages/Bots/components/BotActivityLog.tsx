@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { actionLabels, sourceConfig, formatActionDetails } from "@/utils/activityLabels";
+import { actionLabels, sourceConfig, formatActionDetails, gridAdjustReasons } from "@/utils/activityLabels";
 import { timeSince } from "@/utils/timeago";
-import { History } from "lucide-react";
+import { History, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Ban } from "lucide-react";
 
 export interface ActivityLogEntry {
     id: number;
@@ -12,9 +12,18 @@ export interface ActivityLogEntry {
     details: Record<string, any> | null;
     before_state: Record<string, any> | null;
     after_state: Record<string, any> | null;
+    result?: string;
+    error_message?: string | null;
     created_at: string;
     created_at_fmt: string;
 }
+
+const resultConfig: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
+    success: { icon: CheckCircle2, color: "text-emerald-400", label: "OK" },
+    failed:  { icon: XCircle,      color: "text-red-400",     label: "Error" },
+    partial: { icon: AlertTriangle, color: "text-amber-400",  label: "Parcial" },
+    blocked: { icon: Ban,          color: "text-orange-400",  label: "Bloqueado" },
+};
 
 function StateChanges({ before, after }: { before: Record<string, any>; after: Record<string, any> }) {
     const changes = Object.keys(after).filter(
@@ -96,13 +105,36 @@ export default function BotActivityLog({ logs }: { logs: ActivityLogEntry[] }) {
                                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-normal">
                                                     {log.actor_label}
                                                 </Badge>
+                                                {log.result && log.result !== "success" && (() => {
+                                                    const rc = resultConfig[log.result] ?? resultConfig.failed;
+                                                    const ResultIcon = rc.icon;
+                                                    return (
+                                                        <span className={`inline-flex items-center gap-0.5 text-[10px] ${rc.color}`}>
+                                                            <ResultIcon className="h-3 w-3" />
+                                                            {rc.label}
+                                                        </span>
+                                                    );
+                                                })()}
                                                 <span className="text-xs text-muted-foreground ml-auto shrink-0">
                                                     {log.created_at_fmt} · {timeSince(log.created_at)}
                                                 </span>
                                             </div>
+                                            {log.action === "grid_adjusted" && log.details?.reason && (
+                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <RefreshCw className="h-3 w-3 text-blue-400" />
+                                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                                                        {gridAdjustReasons[log.details.reason] ?? log.details.reason}
+                                                    </Badge>
+                                                </div>
+                                            )}
                                             {detailStr && (
                                                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                                                     {detailStr}
+                                                </p>
+                                            )}
+                                            {log.error_message && (
+                                                <p className="text-[11px] text-red-400 mt-0.5 truncate" title={log.error_message}>
+                                                    {log.error_message}
                                                 </p>
                                             )}
                                             {log.before_state && log.after_state && (

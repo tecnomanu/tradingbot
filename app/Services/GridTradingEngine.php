@@ -8,6 +8,7 @@ use App\Enums\BotSide;
 use App\Enums\BotStatus;
 use App\Enums\OrderSide;
 use App\Enums\OrderStatus;
+use App\Models\BinanceAccount;
 use App\Models\Bot;
 use App\Models\Order;
 use App\Jobs\RunAgentAlertJob;
@@ -26,6 +27,7 @@ class GridTradingEngine
         private BotRepository $botRepository,
         private OrderRepository $orderRepository,
         private GridCalculatorService $gridCalculator,
+        private RiskGuardService $riskGuard,
     ) {}
 
     /**
@@ -45,6 +47,9 @@ class GridTradingEngine
 
         $this->binance->setMarginType($account, $bot->symbol, 'CROSSED');
         $this->binance->setLeverage($account, $bot->symbol, $bot->leverage);
+
+        // Persist the margin type we just configured on the exchange
+        $bot->update(['margin_type' => 'cross']);
 
         $currentPrice = $this->binance->getCurrentPrice($account, $bot->symbol);
 
@@ -166,17 +171,32 @@ class GridTradingEngine
             return;
         }
 
+        // Risk Guard: check all rules BEFORE any trading logic
+        if ($this->riskGuard->guard($bot)) {
+            return;
+        }
+
         try {
             $this->syncOrderStatuses($bot);
             $this->handleFilledOrders($bot);
             $this->autoRebuildIfEmpty($bot);
+            $this->checkPriceRange($bot);
             $this->updateBotStats($bot);
             $this->checkStopConditions($bot);
+
+            $this->riskGuard->clearErrors($bot);
         } catch (Exception $e) {
             Log::error('GridEngine: error processing bot', [
                 'bot_id' => $bot->id,
                 'error' => $e->getMessage(),
             ]);
+
+            $this->riskGuard->recordError($bot);
+
+            BotActivityLogger::logSystemAction($bot, 'exchange_error', [
+                'reason' => 'exchange_sync_failure',
+                'exception' => class_basename($e),
+            ], null, null, BotActivityLogger::RESULT_FAILED, mb_substr($e->getMessage(), 0, 500));
 
             $this->botRepository->update($bot, [
                 'status' => BotStatus::Error,
@@ -230,6 +250,8 @@ class GridTradingEngine
         $newLower = $this->binance->formatPrice($bot->symbol, $newLower);
         $newUpper = $this->binance->formatPrice($bot->symbol, $newUpper);
 
+        $beforeState = BotActivityLogger::captureState($bot);
+
         Log::info('GridEngine: auto-rebuilding grid (0 open orders)', [
             'bot_id' => $bot->id,
             'reason' => 'all_orders_filled',
@@ -247,11 +269,186 @@ class GridTradingEngine
         $bot->refresh();
         $placedCount = $this->rebuildGrid($bot, $currentPrice);
 
+        $this->riskGuard->recordGridRebuild($bot);
+
+        BotActivityLogger::logSystemAction($bot, 'grid_adjusted', [
+            'reason' => 'all_orders_filled',
+            'reason_label' => 'Todas las órdenes ejecutadas — recentrado automático',
+            'old_range' => "{$oldLower}-{$oldUpper}",
+            'new_range' => "{$newLower}-{$newUpper}",
+            'current_price' => $currentPrice,
+            'orders_placed' => $placedCount,
+        ], $beforeState, BotActivityLogger::captureState($bot));
+
         Log::info('GridEngine: auto-rebuild complete', [
             'bot_id' => $bot->id,
             'new_range' => "{$newLower}-{$newUpper}",
             'orders_placed' => $placedCount,
         ]);
+    }
+
+    /**
+     * Out-of-range policy: escalated response based on severity and duration.
+     *
+     * Thresholds (% outside grid range):
+     *   0-1%  → warning log only
+     *   >1% for 3+ consecutive checks → dispatch urgent agent consultation
+     *   >3%  → auto-tighten SL as protective measure + dispatch agent
+     *   >5%  → handled by RiskGuard (stops bot)
+     */
+    private function checkPriceRange(Bot $bot): void
+    {
+        $account = $bot->binanceAccount;
+        if (!$account instanceof BinanceAccount) {
+            return;
+        }
+
+        $currentPrice = $this->binance->getCurrentPrice($account, $bot->symbol);
+        if (!$currentPrice) {
+            return;
+        }
+
+        $lower = (float) $bot->price_lower;
+        $upper = (float) $bot->price_upper;
+
+        if ($currentPrice >= $lower && $currentPrice <= $upper) {
+            Cache::forget("oor_streak.{$bot->id}");
+            return;
+        }
+
+        $isBelow = $currentPrice < $lower;
+        $reference = $isBelow ? $lower : $upper;
+        $deviationPct = abs(($currentPrice - $reference) / $reference) * 100;
+        $direction = $isBelow ? 'below' : 'above';
+
+        // Track consecutive out-of-range checks (each processBot = ~1 min)
+        $streakKey = "oor_streak.{$bot->id}";
+        $streak = (int) Cache::get($streakKey, 0) + 1;
+        Cache::put($streakKey, $streak, now()->addMinutes(10));
+
+        Log::info('GridEngine: price out of range', [
+            'bot_id' => $bot->id,
+            'price' => $currentPrice,
+            'range' => "{$lower}-{$upper}",
+            'deviation_pct' => round($deviationPct, 2),
+            'direction' => $direction,
+            'streak' => $streak,
+        ]);
+
+        // Tier 1: warning only (< 1%)
+        if ($deviationPct < 1.0) {
+            if ($streak === 1) {
+                BotActivityLogger::logSystemAction($bot, 'price_out_of_range', [
+                    'reason' => 'price_deviation_minor',
+                    'direction' => $direction,
+                    'deviation_pct' => round($deviationPct, 2),
+                    'price' => $currentPrice,
+                    'range' => "{$lower}-{$upper}",
+                    'action_taken' => 'none',
+                ]);
+            }
+            return;
+        }
+
+        // Tier 2: sustained breakout (>1% for 3+ minutes) → urgent agent
+        $agentCooldownKey = "oor_agent_cooldown.{$bot->id}";
+        if ($streak >= 3 && !Cache::has($agentCooldownKey)) {
+            Cache::put($agentCooldownKey, true, now()->addMinutes(10));
+
+            $contextMsg = $isBelow
+                ? "URGENT: Price \${$currentPrice} is {$this->fmtPct($deviationPct)}% BELOW grid range ({$lower}-{$upper}). " .
+                  "Sustained breakout ({$streak} min). Bot is Long — this is adverse. " .
+                  "Evaluate: (1) adjust_grid to recenter, (2) tighten stop_loss, (3) close_position if trend confirms."
+                : "URGENT: Price \${$currentPrice} is {$this->fmtPct($deviationPct)}% ABOVE grid range ({$lower}-{$upper}). " .
+                  "Sustained breakout ({$streak} min). Bot is Long — this may be favorable but grid is inactive. " .
+                  "Evaluate: (1) adjust_grid to recenter above, (2) consider taking profit.";
+
+            BotActivityLogger::logSystemAction($bot, 'price_out_of_range', [
+                'reason' => 'sustained_breakout',
+                'direction' => $direction,
+                'deviation_pct' => round($deviationPct, 2),
+                'streak' => $streak,
+                'price' => $currentPrice,
+                'range' => "{$lower}-{$upper}",
+                'action_taken' => 'agent_dispatched',
+            ]);
+
+            RunAgentAlertJob::dispatch($bot, AgentTrigger::PriceBreakout, $contextMsg);
+
+            Log::info('GridEngine: price breakout — agent dispatched', [
+                'bot_id' => $bot->id,
+                'deviation_pct' => round($deviationPct, 2),
+                'streak' => $streak,
+            ]);
+        }
+
+        // Tier 3: severe breakout (>3%) → auto-tighten SL as safety net
+        if ($deviationPct >= 3.0) {
+            $this->autoTightenStopLoss($bot, $currentPrice, $direction, $deviationPct);
+        }
+    }
+
+    /**
+     * Defensive SL tightening when price breaks significantly out of range.
+     * Only sets SL if none exists or current SL is too far from price.
+     * Never moves SL further from price, only tighter.
+     */
+    private function autoTightenStopLoss(Bot $bot, float $currentPrice, string $direction, float $deviationPct): void
+    {
+        $side = $bot->side;
+        $currentSl = $bot->stop_loss_price ? (float) $bot->stop_loss_price : null;
+
+        // For Long bots with price breaking below: SL should be below current price
+        // For Short bots with price breaking above: SL should be above current price
+        $isAdverse = ($side === BotSide::Long && $direction === 'below')
+            || ($side === BotSide::Short && $direction === 'above');
+
+        if (!$isAdverse) {
+            return;
+        }
+
+        $slBuffer = 0.015; // 1.5% buffer from current price
+        $proposedSl = $direction === 'below'
+            ? round($currentPrice * (1 - $slBuffer), 2)
+            : round($currentPrice * (1 + $slBuffer), 2);
+
+        $proposedSl = $this->binance->formatPrice($bot->symbol, $proposedSl);
+
+        // Only tighten: don't set SL further from price than existing
+        if ($currentSl !== null) {
+            $currentSlDistance = abs($currentPrice - $currentSl);
+            $proposedSlDistance = abs($currentPrice - $proposedSl);
+            if ($proposedSlDistance >= $currentSlDistance) {
+                return;
+            }
+        }
+
+        $beforeState = BotActivityLogger::captureState($bot);
+        $this->botRepository->update($bot, ['stop_loss_price' => $proposedSl]);
+        $bot->refresh();
+
+        BotActivityLogger::logSystemAction($bot, 'sl_set', [
+            'reason' => 'price_breakout_protection',
+            'direction' => $direction,
+            'deviation_pct' => round($deviationPct, 2),
+            'price' => $currentPrice,
+            'previous_sl' => $currentSl,
+            'new_sl' => (float) $proposedSl,
+            'buffer_pct' => $slBuffer * 100,
+        ], $beforeState, BotActivityLogger::captureState($bot));
+
+        Log::info('GridEngine: auto-tightened SL on severe breakout', [
+            'bot_id' => $bot->id,
+            'previous_sl' => $currentSl,
+            'new_sl' => $proposedSl,
+            'price' => $currentPrice,
+            'deviation_pct' => round($deviationPct, 2),
+        ]);
+    }
+
+    private function fmtPct(float $val): string
+    {
+        return number_format($val, 2);
     }
 
     /**
@@ -491,24 +688,25 @@ class GridTradingEngine
 
         foreach ($filledOrders as $order) {
             $pnl = 0;
+            $fee = 0;
             $counterSide = null;
             $counterLevel = null;
 
             if ($order->side === OrderSide::Buy) {
                 $counterLevel = $order->grid_level + 1;
                 $counterSide = OrderSide::Sell;
-                $pnl = 0;
             } elseif ($order->side === OrderSide::Sell) {
                 $counterLevel = $order->grid_level - 1;
                 $counterSide = OrderSide::Buy;
 
                 $realQty = $order->quantity ?: $quantityPerGrid;
-                $commission = $order->price * $realQty * 0.0004 * 2;
-                $pnl = round($gridStep * $realQty - $commission, 4);
+                // Estimated round-trip fee: 0.04% taker per side × 2 (buy+sell)
+                $fee = round($order->price * $realQty * 0.0004 * 2, 4);
+                $pnl = round($gridStep * $realQty - $fee, 4);
             }
 
             if ($counterLevel === null || !isset($gridLevels[$counterLevel])) {
-                $order->update(['pnl' => $pnl]);
+                $order->update(['pnl' => $pnl, 'fee' => $fee ?: null]);
                 Log::info('GridEngine: no counter level available (edge of grid)', [
                     'bot_id' => $bot->id,
                     'filled_level' => $order->grid_level,
@@ -524,7 +722,7 @@ class GridTradingEngine
                 ->exists();
 
             if ($existingOpen) {
-                $order->update(['pnl' => $pnl]);
+                $order->update(['pnl' => $pnl, 'fee' => $fee ?: null]);
                 Log::info('GridEngine: counter-order skipped (already exists)', [
                     'bot_id' => $bot->id,
                     'counter_level' => $counterLevel,
@@ -537,10 +735,9 @@ class GridTradingEngine
             $placed = $this->placeCounterOrder($bot, $account, $counterSide, $counterLevel, $counterPrice, $quantityPerGrid);
 
             if ($placed) {
-                $order->update(['pnl' => $pnl]);
+                $order->update(['pnl' => $pnl, 'fee' => $fee ?: null]);
             } else {
-                // Still set pnl so we don't retry forever; autoRebuildIfEmpty will handle grid rebuild
-                $order->update(['pnl' => $pnl]);
+                $order->update(['pnl' => $pnl, 'fee' => $fee ?: null]);
                 Log::warning('GridEngine: counter-order failed, will retry next cycle', [
                     'bot_id' => $bot->id,
                     'filled_order_id' => $order->id,
@@ -617,18 +814,24 @@ class GridTradingEngine
     {
         $filledOrders = $bot->orders()->where('status', OrderStatus::Filled)->get();
 
-        $totalPnl = $filledOrders->sum('pnl');
+        $netGridPnl = $filledOrders->sum('pnl');
+        $totalFees = $filledOrders->sum('fee');
         $sellFills = $filledOrders->where('side', OrderSide::Sell)->count();
         $buyFills = $filledOrders->where('side', OrderSide::Buy)->count();
         $rounds = min($sellFills, $buyFills);
 
         $account = $bot->binanceAccount;
         $trendPnl = 0;
+        $liveMarginType = null;
 
         if ($account) {
             $positions = $this->binance->getPositions($account, $bot->symbol);
             foreach ($positions as $pos) {
                 $trendPnl += $pos['unrealizedProfit'];
+                // Sync margin type from live Binance position data
+                if ($liveMarginType === null && !empty($pos['marginType'])) {
+                    $liveMarginType = strtolower($pos['marginType']);
+                }
             }
         }
 
@@ -638,13 +841,20 @@ class GridTradingEngine
             ->where('filled_at', '>=', now()->subDay())
             ->count();
 
-        $this->botRepository->update($bot, [
-            'total_pnl' => round($totalPnl + $trendPnl, 4),
-            'grid_profit' => round($totalPnl, 4),
+        $updates = [
+            'total_pnl' => round($netGridPnl + $trendPnl, 4),
+            'grid_profit' => round($netGridPnl, 4),
+            'total_fees' => round($totalFees, 4),
             'trend_pnl' => round($trendPnl, 4),
             'total_rounds' => $rounds,
             'rounds_24h' => $rounds24h,
-        ]);
+        ];
+
+        if ($liveMarginType !== null) {
+            $updates['margin_type'] = $liveMarginType;
+        }
+
+        $this->botRepository->update($bot, $updates);
     }
 
     /**

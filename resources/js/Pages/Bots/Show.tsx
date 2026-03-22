@@ -17,15 +17,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import {
+    AgentImpact,
     Bot,
     BotPnlSnapshot,
+    DrawdownMetrics,
     GridConfig,
     Order,
     OrderStats,
     RecentFill,
+    RiskGuardStatus,
 } from "@/types/bot";
 import {
     leverageLabel,
+    marginTypeBadgeClass,
+    marginTypeLabel,
     modeBadgeClass,
     modeLabel,
     sideBadgeClass,
@@ -41,6 +46,8 @@ import { timeSince } from "@/utils/timeago";
 import { RECENT_ACTIVITY_THRESHOLD_MS } from "@/utils/constants";
 import AiPromptConfig from "./components/AiPromptConfig";
 import BotActivityLog, { type ActivityLogEntry } from "./components/BotActivityLog";
+import AgentImpactPanel from "./components/AgentImpactPanel";
+import BotHealthPanel, { type BotHealth } from "./components/BotHealthPanel";
 import { Head, Link, router } from "@inertiajs/react";
 import {
     Activity,
@@ -58,6 +65,7 @@ import {
     RefreshCw,
     Save,
     Server,
+    Shield,
     Trash2,
     User,
     XCircle,
@@ -84,6 +92,8 @@ interface BinancePosition {
     unrealizedProfit: number;
     liquidationPrice: number;
     positionSide: string;
+    leverage: number | null;
+    marginType: string | null;
 }
 
 interface ActivityInfo {
@@ -99,11 +109,15 @@ interface ShowProps {
     gridConfig: GridConfig;
     orders: { data: Order[]; current_page: number; last_page: number };
     pnlHistory: BotPnlSnapshot[];
+    drawdown: DrawdownMetrics;
+    riskGuard: RiskGuardStatus;
     recentFills?: RecentFill[];
     position?: BinancePosition | null;
     activity: ActivityInfo;
     chartOrders?: ChartOrder[];
     activityLogs?: ActivityLogEntry[];
+    health?: BotHealth;
+    agentImpact?: AgentImpact;
 }
 
 export default function Show({
@@ -112,11 +126,15 @@ export default function Show({
     gridConfig,
     orders,
     pnlHistory,
+    drawdown,
+    riskGuard,
     recentFills = [],
     position,
     activity,
     chartOrders = [],
     activityLogs = [],
+    health,
+    agentImpact,
 }: ShowProps) {
     const isRunning = bot.status === "active";
     const roiPct = bot.real_investment
@@ -161,6 +179,11 @@ export default function Show({
                                 {Number(bot.leverage) > 1 && (
                                     <span className="text-xs text-muted-foreground tabular-nums">
                                         {leverageLabel(bot.leverage)}
+                                    </span>
+                                )}
+                                {bot.margin_type && (
+                                    <span className={marginTypeBadgeClass(bot.margin_type, "sm")}>
+                                        {marginTypeLabel(bot.margin_type)}
                                     </span>
                                 )}
                             </div>
@@ -358,7 +381,7 @@ export default function Show({
                         value: `${formatCurrency(bot.real_investment)} USDT`,
                     },
                     {
-                        label: "Beneficio total",
+                        label: "PNL Neto Total",
                         value: `${bot.total_pnl >= 0 ? "+" : ""}${formatCurrency(bot.total_pnl)} USDT`,
                         color:
                             bot.total_pnl >= 0
@@ -366,13 +389,14 @@ export default function Show({
                                 : "text-destructive",
                     },
                     {
-                        label: "Ganancia rejilla",
+                        label: "Grid Neto",
                         value: `${formatCurrency(bot.grid_profit)} USDT`,
                         color: "text-primary",
                     },
                     {
-                        label: "Trend PNL",
-                        value: `${formatCurrency(bot.trend_pnl)} USDT`,
+                        label: "Comisiones",
+                        value: `-${formatCurrency(bot.total_fees)} USDT`,
+                        color: "text-orange-500",
                     },
                     {
                         label: "Rondas totales",
@@ -587,7 +611,7 @@ export default function Show({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 text-xs">
+                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-6 text-xs">
                                     {[
                                         { label: "Tamaño", value: `${position.positionAmt} ${bot.symbol.replace("USDT", "")}` },
                                         { label: "Entrada", value: `${formatCurrency(position.entryPrice, 2)} USDT` },
@@ -604,6 +628,10 @@ export default function Show({
                                             label: "Lado",
                                             value: position.positionAmt > 0 ? "LONG" : "SHORT",
                                             color: position.positionAmt > 0 ? "text-green-500" : "text-destructive",
+                                        },
+                                        {
+                                            label: "Margen",
+                                            value: marginTypeLabel(position.marginType ?? bot.margin_type),
                                         },
                                     ].map((item, i) => (
                                         <div key={i} className="space-y-0.5">
@@ -672,6 +700,10 @@ export default function Show({
                             </div>
                         </CardContent>
                     </Card>
+
+                    {health && (
+                        <BotHealthPanel health={health} isActive={isRunning} />
+                    )}
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         {/* Grid Levels */}
@@ -860,6 +892,7 @@ export default function Show({
                                 ],
                                 ["Rejillas", String(bot.grid_count)],
                                 ["Apalancamiento", `${bot.leverage}x`],
+                                ["Tipo de margen", marginTypeLabel(bot.margin_type)],
                                 [
                                     "Inversión total",
                                     `${formatCurrency(bot.investment)} USDT`,
@@ -909,44 +942,161 @@ export default function Show({
                 </TabsContent>
 
                 <TabsContent value="pnl" className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                        <Card>
-                            <CardContent className="pt-6 text-center">
-                                <p className="text-xs text-muted-foreground">
-                                    PNL Total
-                                </p>
-                                <p
-                                    className={`mt-1 text-2xl font-bold ${bot.total_pnl >= 0 ? "text-green-500" : "text-destructive"}`}
-                                >
-                                    {bot.total_pnl >= 0 ? "+" : ""}
-                                    {formatCurrency(bot.total_pnl)} USDT
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6 text-center">
-                                <p className="text-xs text-muted-foreground">
-                                    Ganancia Grid
-                                </p>
-                                <p className="mt-1 text-2xl font-bold text-primary">
-                                    {formatCurrency(bot.grid_profit)} USDT
-                                </p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6 text-center">
-                                <p className="text-xs text-muted-foreground">
-                                    Trend PNL
-                                </p>
-                                <p
-                                    className={`mt-1 text-2xl font-bold ${bot.trend_pnl >= 0 ? "text-green-500" : "text-destructive"}`}
-                                >
-                                    {bot.trend_pnl >= 0 ? "+" : ""}
-                                    {formatCurrency(bot.trend_pnl)} USDT
-                                </p>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    {/* PNL Breakdown Card */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm">Desglose de PNL</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-0 divide-y">
+                            {(() => {
+                                const grossGrid = Number(bot.grid_profit) + Number(bot.total_fees);
+                                const netTotal = Number(bot.total_pnl);
+                                const rows = [
+                                    { label: "Grid Profit Bruto", value: grossGrid, hint: "Grid neto + comisiones" },
+                                    { label: "Comisiones (est.)", value: -Number(bot.total_fees), color: "text-orange-500", hint: "Taker 0.04% × 2 sides" },
+                                    { label: "Grid Profit Neto", value: Number(bot.grid_profit), bold: true },
+                                    { label: "Unrealized / Trend PNL", value: Number(bot.trend_pnl), hint: "Posición abierta en Binance" },
+                                    { label: "Funding Fees", value: null as number | null, hint: "No disponible en testnet" },
+                                    { label: "PNL Neto Total", value: netTotal, bold: true, big: true },
+                                ];
+                                return rows.map((row) => (
+                                    <div key={row.label} className={`flex items-center justify-between py-3 ${row.big ? "pt-4" : ""}`}>
+                                        <div>
+                                            <span className={`text-sm ${row.bold ? "font-semibold" : "text-muted-foreground"}`}>
+                                                {row.label}
+                                            </span>
+                                            {row.hint && (
+                                                <span className="ml-2 text-xs text-muted-foreground/60">{row.hint}</span>
+                                            )}
+                                        </div>
+                                        <span className={`text-sm font-mono tabular-nums ${row.big ? "text-lg font-bold" : "font-medium"} ${
+                                            row.color ? row.color
+                                            : row.value === null ? "text-muted-foreground"
+                                            : row.value > 0 ? "text-green-500"
+                                            : row.value < 0 ? "text-destructive"
+                                            : ""
+                                        }`}>
+                                            {row.value === null
+                                                ? "N/D"
+                                                : `${row.value > 0 ? "+" : ""}${formatCurrency(row.value)} USDT`}
+                                        </span>
+                                    </div>
+                                ));
+                            })()}
+                            {Number(bot.real_investment) > 0 && (() => {
+                                const roi = (Number(bot.total_pnl) / Number(bot.real_investment)) * 100;
+                                return (
+                                    <div className="flex items-center justify-between py-3">
+                                        <span className="text-sm text-muted-foreground">ROI sobre inversión real</span>
+                                        <span className={`text-sm font-bold ${roi >= 0 ? "text-green-500" : "text-destructive"}`}>
+                                            {formatPercent(roi)}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
+                        </CardContent>
+                    </Card>
+                    {/* Drawdown / Risk Card */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm">Drawdown / Riesgo</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-0 divide-y">
+                            {drawdown.snapshots_used > 0 ? (
+                                <>
+                                    {[
+                                        { label: "Peak PNL", value: drawdown.peak_pnl, hint: "Máximo PNL alcanzado" },
+                                        { label: "PNL actual", value: drawdown.current_pnl },
+                                        { label: "Max Drawdown", value: -drawdown.max_drawdown, color: "text-destructive", bold: true, hint: "Caída máxima desde peak" },
+                                        { label: "Max Drawdown %", pct: drawdown.max_drawdown_pct, color: "text-destructive", bold: true, hint: "Sobre equity en peak" },
+                                    ].map((row) => (
+                                        <div key={row.label} className="flex items-center justify-between py-3">
+                                            <div>
+                                                <span className={`text-sm ${row.bold ? "font-semibold" : "text-muted-foreground"}`}>
+                                                    {row.label}
+                                                </span>
+                                                {row.hint && (
+                                                    <span className="ml-2 text-xs text-muted-foreground/60">{row.hint}</span>
+                                                )}
+                                            </div>
+                                            <span className={`text-sm font-mono tabular-nums font-medium ${row.color ?? (
+                                                (row.value ?? 0) > 0 ? "text-green-500" : (row.value ?? 0) < 0 ? "text-destructive" : ""
+                                            )}`}>
+                                                {"pct" in row
+                                                    ? `-${Number(row.pct).toFixed(2)}%`
+                                                    : `${Number(row.value) > 0 ? "+" : ""}${formatCurrency(Number(row.value))} USDT`}
+                                            </span>
+                                        </div>
+                                    ))}
+                                    {drawdown.drawdown_duration_minutes != null && (
+                                        <div className="flex items-center justify-between py-3">
+                                            <div>
+                                                <span className="text-sm text-muted-foreground">Duración max drawdown</span>
+                                                <span className="ml-2 text-xs text-muted-foreground/60">Tiempo en caída más larga</span>
+                                            </div>
+                                            <span className="text-sm font-mono tabular-nums font-medium">
+                                                {drawdown.drawdown_duration_minutes >= 60
+                                                    ? `${Math.floor(drawdown.drawdown_duration_minutes / 60)}h ${drawdown.drawdown_duration_minutes % 60}m`
+                                                    : `${drawdown.drawdown_duration_minutes}m`}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center justify-between py-3">
+                                        <span className="text-xs text-muted-foreground">
+                                            Basado en {drawdown.snapshots_used} snapshots desde {drawdown.data_since ? new Date(drawdown.data_since).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}
+                                        </span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+                                    Sin datos suficientes para calcular drawdown
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Risk Guard Status */}
+                    <Card className={riskGuard.is_triggered ? "border-destructive" : ""}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-sm">
+                                <Shield className="h-4 w-4" />
+                                Risk Guard
+                                {riskGuard.is_triggered ? (
+                                    <Badge variant="destructive" className="ml-auto text-[10px]">DISPARADO</Badge>
+                                ) : (
+                                    <Badge variant="outline" className="ml-auto text-[10px] border-green-500 text-green-500">ACTIVO</Badge>
+                                )}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-0 divide-y">
+                            {riskGuard.is_triggered && riskGuard.reason && (
+                                <div className="pb-3">
+                                    <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+                                        <p className="text-sm font-medium text-destructive">{riskGuard.reason}</p>
+                                        {riskGuard.triggered_at && (
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                {new Date(riskGuard.triggered_at).toLocaleString("es-AR")}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {[
+                                { label: "Max Drawdown", value: `${riskGuard.effective_config.max_drawdown_pct ?? 10}%` },
+                                { label: "Dist. mín. liquidación", value: `${riskGuard.effective_config.min_liquidation_distance_pct ?? 15}%` },
+                                { label: "Max fuera de rango", value: `${riskGuard.effective_config.max_price_out_of_range_pct ?? 5}%` },
+                                { label: "Max errores consecutivos", value: String(riskGuard.effective_config.max_consecutive_errors ?? 5) },
+                                { label: "Max rebuilds/hora", value: String(riskGuard.effective_config.max_grid_rebuilds_per_hour ?? 3) },
+                                { label: "Emergency stop", value: riskGuard.effective_config.emergency_stop ? "Sí" : "No" },
+                            ].map((row) => (
+                                <div key={row.label} className="flex items-center justify-between py-2.5">
+                                    <span className="text-sm text-muted-foreground">{row.label}</span>
+                                    <span className="text-sm font-mono tabular-nums font-medium">{row.value}</span>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-sm">
@@ -1065,7 +1215,7 @@ export default function Show({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-sm">
-                                Últimas ejecuciones (PNL por transacción)
+                                Últimas ejecuciones (desglose por transacción)
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -1078,11 +1228,16 @@ export default function Show({
                                                 <th className="pb-2 text-left font-medium">Lado</th>
                                                 <th className="pb-2 text-left font-medium">Precio</th>
                                                 <th className="pb-2 text-right font-medium">Cantidad</th>
-                                                <th className="pb-2 text-right font-medium">PNL</th>
+                                                <th className="pb-2 text-right font-medium">Bruto</th>
+                                                <th className="pb-2 text-right font-medium">Fee</th>
+                                                <th className="pb-2 text-right font-medium">Neto</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
-                                            {recentFills.map((fill) => (
+                                            {recentFills.map((fill) => {
+                                                const fee = fill.fee ?? 0;
+                                                const gross = fill.pnl + fee;
+                                                return (
                                                 <tr key={fill.id} className="hover:bg-accent/50">
                                                     <td className="py-2 text-muted-foreground">
                                                         {fill.filled_at_fmt}
@@ -1098,7 +1253,23 @@ export default function Show({
                                                     <td className="py-2 text-right tabular-nums">
                                                         {fill.quantity.toFixed(5)}
                                                     </td>
-                                                    <td className="py-2 text-right">
+                                                    <td className="py-2 text-right font-mono tabular-nums">
+                                                        {fill.side === "sell" ? (
+                                                            <span className={gross > 0 ? "text-green-500" : "text-muted-foreground"}>
+                                                                {gross > 0 ? "+" : ""}{formatCurrency(gross)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono tabular-nums">
+                                                        {fee > 0 ? (
+                                                            <span className="text-orange-500">-{formatCurrency(fee)}</span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 text-right font-mono tabular-nums">
                                                         <span
                                                             className={
                                                                 fill.pnl > 0
@@ -1109,11 +1280,12 @@ export default function Show({
                                                             }
                                                         >
                                                             {fill.pnl > 0 ? "+" : ""}
-                                                            {formatCurrency(fill.pnl)}
+                                                            {fill.pnl !== 0 ? formatCurrency(fill.pnl) : "—"}
                                                         </span>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1124,6 +1296,10 @@ export default function Show({
                             )}
                         </CardContent>
                     </Card>
+
+                    {agentImpact && (
+                        <AgentImpactPanel impact={agentImpact} />
+                    )}
                 </TabsContent>
 
                 <TabsContent value="ai" className="space-y-4">

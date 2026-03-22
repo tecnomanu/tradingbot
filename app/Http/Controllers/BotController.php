@@ -17,7 +17,9 @@ use App\Services\BinanceApiService;
 use App\Services\BotActivityLogger;
 use App\Services\BotService;
 use App\Services\GridCalculatorService;
+use App\Services\AgentImpactService;
 use App\Services\PnlService;
+use App\Services\RiskGuardService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -37,6 +39,8 @@ class BotController extends Controller
         private GridCalculatorService $gridCalculator,
         private PnlService $pnlService,
         private BinanceApiService $binanceApiService,
+        private RiskGuardService $riskGuardService,
+        private AgentImpactService $agentImpactService,
     ) {}
 
     /**
@@ -144,6 +148,7 @@ class BotController extends Controller
         $summary = $this->botService->getBotSummary($bot);
         $orders = $this->orderRepository->getByBot($bot->id);
         $pnlHistory = $this->pnlService->getHistoricalPnl($bot->id);
+        $drawdown = $this->pnlService->calculateDrawdown($bot);
 
         $position = null;
         if (
@@ -188,6 +193,7 @@ class BotController extends Controller
                 'price' => (float) $o->price,
                 'quantity' => (float) $o->quantity,
                 'pnl' => (float) ($o->pnl ?? 0),
+                'fee' => isset($o->fee) ? (float) $o->fee : null,
                 'filled_at' => $o->filled_at?->toIso8601String(),
                 'filled_at_fmt' => $o->filled_at?->format('d/m H:i'),
             ])
@@ -206,9 +212,43 @@ class BotController extends Controller
                 'details' => $log->details,
                 'before_state' => $log->before_state,
                 'after_state' => $log->after_state,
+                'result' => $log->result ?? 'success',
+                'error_message' => $log->error_message,
                 'created_at' => $log->created_at->toIso8601String(),
                 'created_at_fmt' => $log->created_at->format('d/m H:i:s'),
             ]);
+
+        $since24h = now()->subDay();
+        $logsQuery = BotActionLog::where('bot_id', $bot->id);
+
+        $lastError = (clone $logsQuery)->where('result', 'failed')
+            ->orderByDesc('created_at')->first(['action', 'error_message', 'created_at']);
+
+        $lastAgentAction = (clone $logsQuery)->where('source', 'agent')
+            ->orderByDesc('created_at')->first(['action', 'details', 'created_at']);
+
+        $health = [
+            'last_sync_at' => $lastOrderAt?->toIso8601String(),
+            'last_error' => $lastError ? [
+                'action' => $lastError->action,
+                'message' => mb_substr((string) $lastError->error_message, 0, 120),
+                'at' => $lastError->created_at->toIso8601String(),
+            ] : null,
+            'errors_24h' => (clone $logsQuery)->where('result', 'failed')
+                ->where('created_at', '>=', $since24h)->count(),
+            'last_agent_action' => $lastAgentAction ? [
+                'action' => $lastAgentAction->action,
+                'at' => $lastAgentAction->created_at->toIso8601String(),
+                'reason' => $lastAgentAction->details['reason'] ?? null,
+            ] : null,
+            'grid_adjusts_24h' => (clone $logsQuery)->where('action', 'grid_adjusted')
+                ->where('created_at', '>=', $since24h)->count(),
+            'sl_tp_changes_24h' => (clone $logsQuery)->whereIn('action', ['sl_set', 'tp_set'])
+                ->where('created_at', '>=', $since24h)->count(),
+            'cancellations_24h' => (clone $logsQuery)->where('action', 'orders_cancelled')
+                ->where('created_at', '>=', $since24h)->count(),
+            'last_error_message' => $bot->last_error_message,
+        ];
 
         return Inertia::render('Bots/Show', [
             'bot' => $summary['bot'],
@@ -216,6 +256,13 @@ class BotController extends Controller
             'gridConfig' => $summary['grid_config'],
             'orders' => $orders,
             'pnlHistory' => $pnlHistory,
+            'drawdown' => $drawdown,
+            'riskGuard' => [
+                'effective_config' => $this->riskGuardService->getEffectiveConfig($bot),
+                'is_triggered' => $bot->risk_guard_reason !== null,
+                'reason' => $bot->risk_guard_reason,
+                'triggered_at' => $bot->risk_guard_triggered_at?->toIso8601String(),
+            ],
             'position' => $position,
             'activity' => [
                 'last_order_at' => $lastOrderAt?->toIso8601String(),
@@ -226,6 +273,8 @@ class BotController extends Controller
             'chartOrders' => $chartOrders,
             'recentFills' => $recentFills,
             'activityLogs' => $activityLogs,
+            'health' => $health,
+            'agentImpact' => $this->agentImpactService->compare($bot),
         ]);
     }
 
@@ -240,9 +289,13 @@ class BotController extends Controller
             return back()->with('warning', 'El bot ya está activo');
         }
 
+        $beforeState = BotActivityLogger::captureState($bot);
         $this->botService->startBot($bot);
+        $bot->refresh();
 
-        BotActivityLogger::logUserAction($bot, 'bot_started', $request->user());
+        BotActivityLogger::logUserAction($bot, 'bot_started', $request->user(), [
+            'reason' => 'user_action',
+        ], $beforeState, BotActivityLogger::captureState($bot));
 
         return back()->with('success', 'Bot en proceso de inicialización. Las órdenes se colocarán en breve.');
     }
@@ -258,9 +311,13 @@ class BotController extends Controller
             return back()->with('warning', 'El bot no está activo');
         }
 
+        $beforeState = BotActivityLogger::captureState($bot);
         $this->botService->stopBot($bot);
+        $bot->refresh();
 
-        BotActivityLogger::logUserAction($bot, 'bot_stopped', $request->user());
+        BotActivityLogger::logUserAction($bot, 'bot_stopped', $request->user(), [
+            'reason' => 'user_action',
+        ], $beforeState, BotActivityLogger::captureState($bot));
 
         return back()->with('success', 'Bot detenido. Todas las órdenes abiertas fueron canceladas.');
     }
@@ -423,10 +480,23 @@ class BotController extends Controller
             'commission_per_grid' => $gridConfig['commission_per_grid'],
         ]));
 
+        $afterState = BotActivityLogger::captureState($bot);
+
         BotActivityLogger::logUserAction($bot, 'bot_updated', $request->user(), [
             'was_active' => $wasActive,
             'fields_changed' => array_keys($validated),
-        ], $beforeState, BotActivityLogger::captureState($bot));
+        ], $beforeState, $afterState);
+
+        $rangeChanged = $beforeState['price_lower'] !== $afterState['price_lower']
+            || $beforeState['price_upper'] !== $afterState['price_upper'];
+
+        if ($rangeChanged) {
+            BotActivityLogger::logUserAction($bot, 'grid_adjusted', $request->user(), [
+                'reason' => 'manual_action',
+                'old_range' => "{$beforeState['price_lower']}-{$beforeState['price_upper']}",
+                'new_range' => "{$afterState['price_lower']}-{$afterState['price_upper']}",
+            ], $beforeState, $afterState);
+        }
 
         if ($wasActive) {
             $this->botService->startBot($bot);

@@ -384,6 +384,13 @@ class BinanceFuturesService
             $positions = [];
 
             foreach ($items as $pos) {
+                // V3 SDK lacks getMarginType()/getLeverage(); infer margin type
+                // from isolatedMargin/isolatedWallet fields:
+                // non-zero → isolated, zero → cross.
+                $isolatedMargin = (float) $pos->getIsolatedMargin();
+                $isolatedWallet = (float) $pos->getIsolatedWallet();
+                $inferredMarginType = ($isolatedMargin > 0 || $isolatedWallet > 0) ? 'isolated' : 'cross';
+
                 $positions[] = [
                     'symbol' => $pos->getSymbol(),
                     'positionAmt' => (float) $pos->getPositionAmt(),
@@ -391,6 +398,8 @@ class BinanceFuturesService
                     'unrealizedProfit' => (float) $pos->getUnRealizedProfit(),
                     'liquidationPrice' => (float) $pos->getLiquidationPrice(),
                     'positionSide' => $pos->getPositionSide(),
+                    'leverage' => method_exists($pos, 'getLeverage') ? (int) $pos->getLeverage() : null,
+                    'marginType' => $inferredMarginType,
                 ];
             }
 

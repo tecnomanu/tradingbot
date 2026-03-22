@@ -3,16 +3,15 @@
 namespace App\Services\Agent;
 
 use App\Constants\BinanceConstants;
-use App\Enums\ActionSource;
 use App\Enums\AgentTrigger;
 use App\Enums\BotStatus;
 use App\Enums\OrderSide;
 use App\Enums\OrderStatus;
 use App\Models\Bot;
-use App\Models\BotActionLog;
 use App\Services\AiTradingAgent;
 use App\Services\BinanceApiService;
 use App\Services\BinanceFuturesService;
+use App\Services\BotActivityLogger;
 use App\Services\BotService;
 use App\Services\GridTradingEngine;
 use App\Support\BotLog as Log;
@@ -72,10 +71,11 @@ class AgentToolkit
             $this->tool('cancel_all_orders', 'Cancel all open orders.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('adjust_grid', 'Adjust grid range. Preferred over stop.', [
+            $this->tool('adjust_grid', 'Adjust grid range. Preferred over stop. Provide reason: price_outside_range, volatility_shift, trend_change, protection_mode, bot_recovery.', [
                 'bot_id' => ['type' => 'integer'],
                 'new_price_lower' => ['type' => 'number'],
                 'new_price_upper' => ['type' => 'number'],
+                'reason' => ['type' => 'string', 'description' => 'Why: price_outside_range | volatility_shift | trend_change | protection_mode | bot_recovery'],
             ]),
             $this->tool('stop_bot', 'Stop bot. LAST RESORT.', [
                 'bot_id' => ['type' => 'integer'],
@@ -262,7 +262,8 @@ class AgentToolkit
 
         $bot->update(['stop_loss_price' => $price]);
 
-        $this->logAction($bot, 'sl_set', ActionSource::Agent, [
+        $this->logAction($bot, 'sl_set', [
+            'reason' => 'agent_decision',
             'price' => $price,
             'previous' => $before ?: null,
         ]);
@@ -284,13 +285,22 @@ class AgentToolkit
 
         $bot->update(['take_profit_price' => $price]);
 
-        $this->logAction($bot, 'tp_set', ActionSource::Agent, [
+        $this->logAction($bot, 'tp_set', [
+            'reason' => 'agent_decision',
             'price' => $price,
             'previous' => $before ?: null,
         ]);
 
         return ['success' => true, 'take_profit_price' => $price, 'previous' => $before ?: null];
     }
+
+    private const VALID_GRID_REASONS = [
+        'price_outside_range',
+        'volatility_shift',
+        'trend_change',
+        'protection_mode',
+        'bot_recovery',
+    ];
 
     private function toolAdjustGrid(Bot $bot, array $args): array
     {
@@ -301,8 +311,14 @@ class AgentToolkit
             return ['error' => 'Invalid price range: lower must be > 0 and < upper'];
         }
 
+        $reason = $args['reason'] ?? 'unknown';
+        if (!in_array($reason, self::VALID_GRID_REASONS, true)) {
+            $reason = 'unknown';
+        }
+
         $oldLower = (float) $bot->price_lower;
         $oldUpper = (float) $bot->price_upper;
+        $beforeState = BotActivityLogger::captureState($bot);
 
         $account = $bot->binanceAccount;
         if (!$account) {
@@ -318,21 +334,31 @@ class AgentToolkit
                 'price_upper' => $newUpper,
             ]);
 
-            $this->engine->reinitializeGrid($bot->fresh());
+            $freshBot = $bot->fresh();
+            $this->engine->reinitializeGrid($freshBot);
 
-            $this->logAction($bot, 'grid_adjusted', ActionSource::Agent, [
+            $afterState = BotActivityLogger::captureState($freshBot);
+
+            $this->logAction($bot, 'grid_adjusted', [
+                'reason' => $reason,
                 'old_range' => "{$oldLower}-{$oldUpper}",
                 'new_range' => "{$newLower}-{$newUpper}",
-            ]);
+            ], $beforeState, $afterState);
 
             return [
                 'success' => true,
+                'reason' => $reason,
                 'old_range' => "{$oldLower}-{$oldUpper}",
                 'new_range' => "{$newLower}-{$newUpper}",
                 'message' => "Grid adjusted from {$oldLower}-{$oldUpper} to {$newLower}-{$newUpper}",
             ];
         } catch (\Exception $e) {
             Log::error('AgentToolkit: adjust_grid failed', ['error' => $e->getMessage()]);
+            $this->logAction($bot, 'grid_adjusted', [
+                'reason' => $reason,
+                'old_range' => "{$oldLower}-{$oldUpper}",
+                'new_range' => "{$newLower}-{$newUpper}",
+            ], $beforeState, null, BotActivityLogger::RESULT_FAILED, $e->getMessage());
             return ['error' => 'Failed to adjust grid: ' . $e->getMessage()];
         }
     }
@@ -348,7 +374,8 @@ class AgentToolkit
         $this->binanceFutures->cancelAllOrders($account, $bot->symbol);
         $bot->orders()->where('status', OrderStatus::Open)->update(['status' => OrderStatus::Cancelled]);
 
-        $this->logAction($bot, 'orders_cancelled', ActionSource::Agent, [
+        $this->logAction($bot, 'orders_cancelled', [
+            'reason' => 'agent_decision',
             'cancelled_count' => $openCount,
         ]);
 
@@ -364,11 +391,11 @@ class AgentToolkit
         // Rationale: auto-stopping creates a permanent outage — the agent only monitors active
         // bots, so stopping the bot also stops monitoring with no automatic recovery.
         // For SL/TP alerts the intent is repair (adjust_grid + new SL/TP), not shutdown.
-        if (in_array($this->trigger, [AgentTrigger::Scheduled, AgentTrigger::SlTpAlert])) {
-            $this->logAction($bot, 'bot_stop_blocked', ActionSource::Agent, [
+        if (in_array($this->trigger, [AgentTrigger::Scheduled, AgentTrigger::SlTpAlert, AgentTrigger::PriceBreakout])) {
+            $this->logAction($bot, 'bot_stop_blocked', [
                 'reason' => $reason,
                 'trigger' => $this->trigger->value,
-            ]);
+            ], null, null, BotActivityLogger::RESULT_BLOCKED);
 
             return [
                 'blocked' => true,
@@ -377,7 +404,7 @@ class AgentToolkit
             ];
         }
 
-        $this->logAction($bot, 'bot_stopped', ActionSource::Agent, ['reason' => $reason]);
+        $this->logAction($bot, 'bot_stopped', ['reason' => $reason]);
         $this->engine->stopBot($bot);
 
         return ['success' => true, 'message' => "Bot stopped: {$reason}"];
@@ -400,7 +427,8 @@ class AgentToolkit
         $side = $posAmt > 0 ? BinanceConstants::SIDE_SELL : BinanceConstants::SIDE_BUY;
         $qty = $this->binanceFutures->formatQuantity($bot->symbol, abs($posAmt));
 
-        $this->logAction($bot, 'position_closed', ActionSource::Agent, [
+        $this->logAction($bot, 'position_closed', [
+            'reason' => 'agent_decision',
             'size' => $posAmt,
             'close_side' => $side,
             'unrealized_pnl' => $pos['unRealizedProfit'] ?? 0,
@@ -411,14 +439,18 @@ class AgentToolkit
         return ['success' => true, 'closed_size' => $posAmt, 'close_side' => $side];
     }
 
-    private function logAction(Bot $bot, string $action, ActionSource $source, array $details = []): void
-    {
-        BotActionLog::create([
-            'bot_id' => $bot->id,
-            'conversation_id' => $this->conversationId,
-            'action' => $action,
-            'source' => $source->value,
-            'details' => $details,
-        ]);
+    private function logAction(
+        Bot $bot,
+        string $action,
+        array $details = [],
+        ?array $beforeState = null,
+        ?array $afterState = null,
+        string $result = BotActivityLogger::RESULT_SUCCESS,
+        ?string $errorMessage = null,
+    ): void {
+        BotActivityLogger::logAgentAction(
+            $bot, $action, $details, $this->conversationId,
+            $beforeState, $afterState, $result, $errorMessage,
+        );
     }
 }
