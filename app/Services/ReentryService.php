@@ -35,12 +35,7 @@ class ReentryService
             return ['success' => false, 'reason' => 'Bot no fue detenido por Risk Guard'];
         }
 
-        $this->botRepository->update($bot, [
-            'reentry_last_attempt_at' => now(),
-        ]);
-
         $checks = [
-            fn () => $this->checkCooldown($bot),
             fn () => $this->checkAccount($bot),
             fn () => $this->checkPriceInRange($bot),
             fn () => $this->checkLiquidationDistance($bot),
@@ -48,9 +43,15 @@ class ReentryService
             fn () => $this->checkRecentRebuilds($bot),
         ];
 
+        // Cooldown only applies to automatic triggers, not manual
+        if ($trigger === 'automatic') {
+            array_unshift($checks, fn () => $this->checkCooldown($bot));
+        }
+
         foreach ($checks as $check) {
             $blockReason = $check();
             if ($blockReason !== null) {
+                $this->botRepository->update($bot, ['reentry_last_attempt_at' => now()]);
                 $this->logBlocked($bot, $blockReason, $trigger);
                 return ['success' => false, 'reason' => $blockReason];
             }
@@ -83,14 +84,15 @@ class ReentryService
     {
         $cooldownMinutes = $bot->reentry_cooldown_minutes ?: 60;
         $lastAttempt = $bot->reentry_last_attempt_at;
-        $stoppedAt = $bot->stopped_at;
 
-        $referenceTime = $lastAttempt && $stoppedAt
-            ? max($lastAttempt, $stoppedAt)
-            : ($stoppedAt ?? now()->subYear());
+        // Only enforce cooldown between automatic attempts
+        if (!$lastAttempt) {
+            return null;
+        }
 
-        if ($referenceTime->diffInMinutes(now()) < $cooldownMinutes) {
-            $remaining = $cooldownMinutes - $referenceTime->diffInMinutes(now());
+        $elapsed = $lastAttempt->diffInMinutes(now());
+        if ($elapsed < $cooldownMinutes) {
+            $remaining = $cooldownMinutes - $elapsed;
             return "Cooldown activo: faltan {$remaining} minutos";
         }
 

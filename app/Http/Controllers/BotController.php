@@ -344,11 +344,11 @@ class BotController extends Controller
         $this->authorizeBot($request, $bot);
 
         if ($bot->status !== BotStatus::Stopped) {
-            return back()->with('warning', 'El bot no está detenido');
+            return back()->with('error', 'El bot no está detenido');
         }
 
         if ($bot->stop_reason !== 'risk_guard') {
-            return back()->with('warning', 'Solo se puede reingresar bots detenidos por Risk Guard');
+            return back()->with('error', 'Solo se puede reingresar bots detenidos por Risk Guard');
         }
 
         $reentryService = app(\App\Services\ReentryService::class);
@@ -366,7 +366,7 @@ class BotController extends Controller
             'trigger' => 'manual',
             'reason' => $result['reason'],
         ]);
-        return back()->with('warning', 'Re-entry bloqueado: ' . $result['reason']);
+        return back()->with('error', 'Re-entry bloqueado: ' . $result['reason']);
     }
 
     /**
