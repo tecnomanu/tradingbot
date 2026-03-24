@@ -19,6 +19,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('bots', BotController::class)->except(['create']);
     Route::post('/bots/{bot}/start', [BotController::class, 'start'])->name('bots.start');
     Route::post('/bots/{bot}/stop', [BotController::class, 'stop'])->name('bots.stop');
+    Route::post('/bots/{bot}/reentry', [BotController::class, 'attemptReentry'])->name('bots.reentry');
     Route::post('/bots/calculate-grid', [BotController::class, 'calculateGrid'])->name('bots.calculate-grid');
     Route::post('/bots/current-price', [BotController::class, 'currentPrice'])->name('bots.current-price');
 

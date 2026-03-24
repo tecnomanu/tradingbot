@@ -38,6 +38,12 @@ class Bot extends Model
         'risk_config',
         'risk_guard_reason',
         'risk_guard_triggered_at',
+        'risk_guard_level',
+        'stop_reason',
+        'reentry_enabled',
+        'reentry_cooldown_minutes',
+        'reentry_last_attempt_at',
+        'reentry_last_block_reason',
         'real_investment',
         'additional_margin',
         'est_liquidation_price',
@@ -78,6 +84,9 @@ class Bot extends Model
         'ai_notify_events' => 'array',
         'risk_config' => 'array',
         'risk_guard_triggered_at' => 'datetime',
+        'reentry_enabled' => 'boolean',
+        'reentry_cooldown_minutes' => 'integer',
+        'reentry_last_attempt_at' => 'datetime',
         'total_rounds' => 'integer',
         'rounds_24h' => 'integer',
         'started_at' => 'datetime',
@@ -118,6 +127,13 @@ class Bot extends Model
     public function scopeForUser($query, int $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    public function scopeReentryCandidates($query)
+    {
+        return $query->where('status', BotStatus::Stopped)
+            ->where('stop_reason', 'risk_guard')
+            ->where('reentry_enabled', true);
     }
 
     /**

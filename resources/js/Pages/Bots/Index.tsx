@@ -87,6 +87,12 @@ export default function Index({
         stop_loss_price: editBot?.stop_loss_price ?? "",
         take_profit_price: editBot?.take_profit_price ?? "",
         grid_mode: editBot?.grid_mode ?? "arithmetic",
+        drawdown_mode: "peak_equity_drawdown",
+        soft_guard_drawdown_pct: "",
+        hard_guard_drawdown_pct: "",
+        hard_guard_action: "stop_bot_only",
+        reentry_enabled: false,
+        reentry_cooldown_minutes: "60",
     });
 
     const { balance, loading: fetchingBalance } = useBalance(data.binance_account_id);

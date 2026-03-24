@@ -29,7 +29,13 @@ class StoreBotRequest extends FormRequest
             'slippage'           => 'nullable|numeric|min:0|max:5',
             'stop_loss_price'    => 'nullable|numeric|min:0',
             'take_profit_price'  => 'nullable|numeric|min:0',
-            'grid_mode'          => 'nullable|string|in:arithmetic,geometric',
+            'grid_mode'                    => 'nullable|string|in:arithmetic,geometric',
+            'drawdown_mode'                => 'nullable|string|in:peak_equity_drawdown,initial_capital_loss',
+            'soft_guard_drawdown_pct'      => 'nullable|numeric|min:0|max:100',
+            'hard_guard_drawdown_pct'      => 'nullable|numeric|min:0|max:100',
+            'hard_guard_action'            => 'nullable|string|in:stop_bot_only,close_position_and_stop,pause_and_rebuild,notify_only',
+            'reentry_enabled'              => 'nullable|boolean',
+            'reentry_cooldown_minutes'     => 'nullable|integer|min:5|max:1440',
         ];
     }
 }

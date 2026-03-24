@@ -95,6 +95,8 @@ class BotActivityLogger
     {
         return [
             'status' => $bot->status->value,
+            'stop_reason' => $bot->stop_reason,
+            'risk_guard_level' => $bot->risk_guard_level,
             'price_lower' => (float) $bot->price_lower,
             'price_upper' => (float) $bot->price_upper,
             'grid_count' => $bot->grid_count,

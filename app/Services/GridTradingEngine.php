@@ -176,10 +176,18 @@ class GridTradingEngine
             return;
         }
 
+        $bot->refresh();
+        $isProtected = $bot->risk_guard_level === 'soft';
+
         try {
             $this->syncOrderStatuses($bot);
             $this->handleFilledOrders($bot);
-            $this->autoRebuildIfEmpty($bot);
+
+            // Soft guard: skip auto-rebuild to avoid rebalancing into a losing position
+            if (!$isProtected) {
+                $this->autoRebuildIfEmpty($bot);
+            }
+
             $this->checkPriceRange($bot);
             $this->updateBotStats($bot);
             $this->checkStopConditions($bot);

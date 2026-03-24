@@ -47,6 +47,10 @@ export interface Bot {
     risk_config: RiskConfig | null;
     risk_guard_reason: string | null;
     risk_guard_triggered_at: string | null;
+    risk_guard_level: RiskGuardLevel;
+    stop_reason: StopReason;
+    reentry_enabled: boolean;
+    reentry_cooldown_minutes: number;
     started_at: string | null;
     stopped_at: string | null;
     created_at: string;
@@ -96,6 +100,10 @@ export interface DrawdownMetrics {
 
 export interface RiskConfig {
     max_drawdown_pct?: number;
+    soft_guard_drawdown_pct?: number;
+    hard_guard_drawdown_pct?: number;
+    hard_guard_action?: 'stop_bot_only' | 'close_position_and_stop' | 'pause_and_rebuild' | 'notify_only';
+    drawdown_mode?: 'peak_equity_drawdown' | 'initial_capital_loss';
     min_liquidation_distance_pct?: number;
     max_price_out_of_range_pct?: number;
     max_consecutive_errors?: number;
@@ -103,11 +111,20 @@ export interface RiskConfig {
     emergency_stop?: boolean;
 }
 
+export type StopReason = 'manual' | 'risk_guard' | 'error' | null;
+export type RiskGuardLevel = 'soft' | 'hard' | null;
+
 export interface RiskGuardStatus {
     effective_config: RiskConfig;
     is_triggered: boolean;
+    level: RiskGuardLevel;
     reason: string | null;
     triggered_at: string | null;
+    stop_reason: StopReason;
+    reentry_enabled: boolean;
+    reentry_cooldown_minutes: number;
+    reentry_last_attempt_at: string | null;
+    reentry_last_block_reason: string | null;
 }
 
 export interface DashboardStats {

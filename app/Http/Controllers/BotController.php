@@ -119,6 +119,8 @@ class BotController extends Controller
         $validated['grid_mode'] = $validated['grid_mode'] ?? 'arithmetic';
         $validated['user_id'] = $request->user()->id;
 
+        $validated = $this->extractRiskGuardConfig($validated);
+
         $bot = $this->botService->createBot($validated);
 
         BotActivityLogger::logUserAction($bot, 'bot_created', $request->user(), [
@@ -260,8 +262,14 @@ class BotController extends Controller
             'riskGuard' => [
                 'effective_config' => $this->riskGuardService->getEffectiveConfig($bot),
                 'is_triggered' => $bot->risk_guard_reason !== null,
+                'level' => $bot->risk_guard_level,
                 'reason' => $bot->risk_guard_reason,
                 'triggered_at' => $bot->risk_guard_triggered_at?->toIso8601String(),
+                'stop_reason' => $bot->stop_reason,
+                'reentry_enabled' => $bot->reentry_enabled,
+                'reentry_cooldown_minutes' => $bot->reentry_cooldown_minutes,
+                'reentry_last_attempt_at' => $bot->reentry_last_attempt_at?->toIso8601String(),
+                'reentry_last_block_reason' => $bot->reentry_last_block_reason,
             ],
             'position' => $position,
             'activity' => [
@@ -315,11 +323,50 @@ class BotController extends Controller
         $this->botService->stopBot($bot);
         $bot->refresh();
 
+        $bot->update([
+            'stop_reason' => 'manual',
+            'risk_guard_level' => null,
+            'risk_guard_reason' => null,
+        ]);
+
         BotActivityLogger::logUserAction($bot, 'bot_stopped', $request->user(), [
             'reason' => 'user_action',
         ], $beforeState, BotActivityLogger::captureState($bot));
 
         return back()->with('success', 'Bot detenido. Todas las órdenes abiertas fueron canceladas.');
+    }
+
+    /**
+     * Attempt manual re-entry for a bot stopped by risk guard.
+     */
+    public function attemptReentry(Request $request, Bot $bot): RedirectResponse
+    {
+        $this->authorizeBot($request, $bot);
+
+        if ($bot->status !== BotStatus::Stopped) {
+            return back()->with('warning', 'El bot no está detenido');
+        }
+
+        if ($bot->stop_reason !== 'risk_guard') {
+            return back()->with('warning', 'Solo se puede reingresar bots detenidos por Risk Guard');
+        }
+
+        $reentryService = app(\App\Services\ReentryService::class);
+        $result = $reentryService->attemptReentry($bot, 'manual');
+
+        if ($result['success']) {
+            BotActivityLogger::logUserAction($bot, 'reentry_success', $request->user(), [
+                'trigger' => 'manual',
+                'reason' => $result['reason'],
+            ]);
+            return back()->with('success', 'Re-entry exitoso: ' . $result['reason']);
+        }
+
+        BotActivityLogger::logUserAction($bot, 'reentry_blocked', $request->user(), [
+            'trigger' => 'manual',
+            'reason' => $result['reason'],
+        ]);
+        return back()->with('warning', 'Re-entry bloqueado: ' . $result['reason']);
     }
 
     /**
@@ -454,6 +501,7 @@ class BotController extends Controller
         $validated = $request->validated();
 
         $validated['grid_mode'] = $validated['grid_mode'] ?? $bot->grid_mode ?? 'arithmetic';
+        $validated = $this->extractRiskGuardConfig($validated, $bot);
         $wasActive = $bot->status === BotStatus::Active;
         $beforeState = BotActivityLogger::captureState($bot);
 
@@ -525,6 +573,42 @@ class BotController extends Controller
 
         return redirect()->route('bots.index')
             ->with('success', 'Bot eliminado');
+    }
+
+    /**
+     * Extract risk guard fields from validated data and merge into risk_config + separate columns.
+     *
+     * @return array<string, mixed>
+     */
+    private function extractRiskGuardConfig(array $validated, ?Bot $existingBot = null): array
+    {
+        $riskFields = ['drawdown_mode', 'soft_guard_drawdown_pct', 'hard_guard_drawdown_pct', 'hard_guard_action'];
+        $riskConfig = $existingBot?->risk_config ?? [];
+        $hasRiskData = false;
+
+        foreach ($riskFields as $field) {
+            if (isset($validated[$field]) && $validated[$field] !== '' && $validated[$field] !== null) {
+                $riskConfig[$field] = is_numeric($validated[$field]) ? (float) $validated[$field] : $validated[$field];
+                $hasRiskData = true;
+            }
+            unset($validated[$field]);
+        }
+
+        if ($hasRiskData) {
+            $validated['risk_config'] = $riskConfig;
+        }
+
+        if (isset($validated['reentry_enabled'])) {
+            $validated['reentry_enabled'] = (bool) $validated['reentry_enabled'];
+        }
+
+        if (isset($validated['reentry_cooldown_minutes']) && $validated['reentry_cooldown_minutes'] !== '') {
+            $validated['reentry_cooldown_minutes'] = (int) $validated['reentry_cooldown_minutes'];
+        } else {
+            unset($validated['reentry_cooldown_minutes']);
+        }
+
+        return $validated;
     }
 
     /**

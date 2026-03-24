@@ -49,6 +49,12 @@ interface BotFormData {
     stop_loss_price: string;
     take_profit_price: string;
     grid_mode: string;
+    drawdown_mode: string;
+    soft_guard_drawdown_pct: string;
+    hard_guard_drawdown_pct: string;
+    hard_guard_action: string;
+    reentry_enabled: boolean;
+    reentry_cooldown_minutes: string;
 }
 
 interface BotFormAdvancedProps {
@@ -676,6 +682,72 @@ export default function BotFormAdvanced({
                                         Geométrica
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* Risk Guard v2 */}
+                            <Separator className="my-2" />
+                            <div className="space-y-2">
+                                <span className="text-xs font-medium text-muted-foreground">Risk Guard</span>
+
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-muted-foreground">Modo drawdown</span>
+                                    <div className="flex bg-muted/50 p-0.5 rounded text-[10px]">
+                                        <button type="button" onClick={() => setData("drawdown_mode", "peak_equity_drawdown")}
+                                            className={cn("px-2 py-0.5 rounded transition-colors", data.drawdown_mode === "peak_equity_drawdown" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>
+                                            Desde pico
+                                        </button>
+                                        <button type="button" onClick={() => setData("drawdown_mode", "initial_capital_loss")}
+                                            className={cn("px-2 py-0.5 rounded transition-colors", data.drawdown_mode === "initial_capital_loss" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground")}>
+                                            S/ capital
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground/70">
+                                    {data.drawdown_mode === "initial_capital_loss"
+                                        ? "Pérdida como % de la inversión real."
+                                        : "Caída desde el mejor PNL alcanzado."}
+                                </p>
+
+                                <div className="flex justify-between items-center gap-3 text-xs">
+                                    <span className="text-muted-foreground whitespace-nowrap">Soft Guard %</span>
+                                    <Input type="number" step="0.1" value={data.soft_guard_drawdown_pct}
+                                        onChange={(e) => setData("soft_guard_drawdown_pct", e.target.value)}
+                                        placeholder="15" className="h-7 w-20 text-xs tabular-nums text-right" />
+                                </div>
+                                <div className="flex justify-between items-center gap-3 text-xs">
+                                    <span className="text-muted-foreground whitespace-nowrap">Hard Guard %</span>
+                                    <Input type="number" step="0.1" value={data.hard_guard_drawdown_pct}
+                                        onChange={(e) => setData("hard_guard_drawdown_pct", e.target.value)}
+                                        placeholder="20" className="h-7 w-20 text-xs tabular-nums text-right" />
+                                </div>
+
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-muted-foreground">Acción hard</span>
+                                    <select value={data.hard_guard_action}
+                                        onChange={(e) => setData("hard_guard_action", e.target.value)}
+                                        className="h-7 text-[10px] bg-background border rounded px-1.5">
+                                        <option value="stop_bot_only">Detener</option>
+                                        <option value="close_position_and_stop">Cerrar + detener</option>
+                                        <option value="pause_and_rebuild">Pausar + rebuild</option>
+                                        <option value="notify_only">Solo notificar</option>
+                                    </select>
+                                </div>
+
+                                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                    <input type="checkbox" checked={data.reentry_enabled}
+                                        onChange={(e) => setData("reentry_enabled", e.target.checked)}
+                                        className="rounded border-border h-3.5 w-3.5" />
+                                    <span className="text-muted-foreground">Re-entry automático</span>
+                                </label>
+
+                                {data.reentry_enabled && (
+                                    <div className="flex justify-between items-center gap-3 text-xs">
+                                        <span className="text-muted-foreground whitespace-nowrap">Cooldown (min)</span>
+                                        <Input type="number" value={data.reentry_cooldown_minutes}
+                                            onChange={(e) => setData("reentry_cooldown_minutes", e.target.value)}
+                                            placeholder="60" className="h-7 w-20 text-xs tabular-nums text-right" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

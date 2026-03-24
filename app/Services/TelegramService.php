@@ -77,6 +77,84 @@ class TelegramService
     }
 
     /**
+     * Format Risk Guard trigger notification for Telegram.
+     */
+    public function formatRiskGuardNotification(
+        string $botName,
+        string $symbol,
+        string $reason,
+        string $level = 'hard',
+        string $action = 'stop_bot_only',
+        string $drawdownMode = 'peak_equity_drawdown',
+    ): string {
+        $emoji = $level === 'soft' ? '⚠️' : '🚨';
+        $levelLabel = $level === 'soft' ? 'SOFT GUARD' : 'HARD GUARD';
+        $modeLabel = $drawdownMode === 'initial_capital_loss' ? 'Pérdida s/ capital' : 'Drawdown desde pico';
+
+        $actionLabels = [
+            'stop_bot_only' => 'Bot detenido',
+            'close_position_and_stop' => 'Posición cerrada + bot detenido',
+            'pause_and_rebuild' => 'Pausado para re-entry automático',
+            'notify_only' => 'Solo notificación (bot sigue activo)',
+        ];
+
+        $lines = [
+            "{$emoji} <b>{$levelLabel} — {$botName}</b> ({$symbol})",
+            '',
+            $reason,
+            '',
+            "<b>Modo:</b> {$modeLabel}",
+        ];
+
+        if ($level === 'hard') {
+            $lines[] = "<b>Acción:</b> " . ($actionLabels[$action] ?? $action);
+        } else {
+            $lines[] = '<b>Acción:</b> Protección activa (bot sigue operando)';
+        }
+
+        if ($level === 'soft') {
+            $lines[] = '';
+            $lines[] = '🛡 El bot entró en modo protección: sin rebuilds, agente conservador.';
+        } elseif ($action === 'pause_and_rebuild') {
+            $lines[] = '';
+            $lines[] = '🔄 Se intentará re-entry automático cuando las condiciones mejoren.';
+        } else {
+            $lines[] = '';
+            $lines[] = '⚠️ Revisá el bot y reiniciá manualmente si corresponde.';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Format re-entry notification for Telegram.
+     */
+    public function formatReentryNotification(
+        string $botName,
+        string $symbol,
+        bool $success,
+        string $reason,
+    ): string {
+        if ($success) {
+            return implode("\n", [
+                "🔄 <b>Re-entry exitoso — {$botName}</b> ({$symbol})",
+                '',
+                $reason,
+                '',
+                '✅ El bot fue reactivado con grid reconstruido.',
+            ]);
+        }
+
+        return implode("\n", [
+            "⏸ <b>Re-entry bloqueado — {$botName}</b> ({$symbol})",
+            '',
+            "<b>Motivo:</b> {$reason}",
+            '',
+            '⏳ Se reintentará en el próximo ciclo.',
+        ]);
+    }
+
+    /**
      * Format agent consultation result for Telegram.
      */
     public function formatAgentNotification(

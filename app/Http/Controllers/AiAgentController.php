@@ -109,7 +109,7 @@ class AiAgentController extends Controller
             'ai_consultation_interval' => 'nullable|integer|in:5,10,15,30,60',
             'ai_notify_telegram' => 'nullable|boolean',
             'ai_notify_events' => 'nullable|array',
-            'ai_notify_events.*' => 'string|in:grid_adjusted,bot_stopped,stop_loss_set,take_profit_set,position_closed,orders_cancelled',
+            'ai_notify_events.*' => 'string|in:grid_adjusted,bot_stopped,risk_guard_triggered,soft_guard_triggered,hard_guard_triggered,reentry_success,reentry_blocked,stop_loss_set,take_profit_set,position_closed,orders_cancelled',
         ]);
 
         $bot->update([

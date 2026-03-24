@@ -51,7 +51,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
     const [userPrompt, setUserPrompt] = useState(bot.ai_user_prompt ?? "");
     const [interval, setInterval] = useState(bot.ai_consultation_interval || 15);
     const [notifyTelegram, setNotifyTelegram] = useState(bot.ai_notify_telegram ?? false);
-    const [notifyEvents, setNotifyEvents] = useState<string[]>(bot.ai_notify_events ?? ["grid_adjusted", "bot_stopped", "stop_loss_set", "position_closed"]);
+    const [notifyEvents, setNotifyEvents] = useState<string[]>(bot.ai_notify_events ?? ["grid_adjusted", "bot_stopped", "risk_guard_triggered", "stop_loss_set", "position_closed"]);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [review, setReview] = useState<string | null>(null);
@@ -260,6 +260,11 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                                     {[
                                         { key: "grid_adjusted", label: "Grid ajustado" },
                                         { key: "bot_stopped", label: "Bot detenido" },
+                                        { key: "risk_guard_triggered", label: "Risk Guard" },
+                                        { key: "soft_guard_triggered", label: "Soft Guard" },
+                                        { key: "hard_guard_triggered", label: "Hard Guard" },
+                                        { key: "reentry_success", label: "Re-entry exitoso" },
+                                        { key: "reentry_blocked", label: "Re-entry bloqueado" },
                                         { key: "stop_loss_set", label: "Stop Loss" },
                                         { key: "take_profit_set", label: "Take Profit" },
                                         { key: "position_closed", label: "Posición cerrada" },

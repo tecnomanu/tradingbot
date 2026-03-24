@@ -63,6 +63,7 @@ import {
     Pencil,
     Play,
     RefreshCw,
+    RotateCcw,
     Save,
     Server,
     Shield,
@@ -170,6 +171,12 @@ export default function Show({
                                 >
                                     {statusLabel(bot.status)}
                                 </Badge>
+                                {bot.stop_reason === "risk_guard" && bot.status === "stopped" && (
+                                    <Badge variant="outline" className="text-[10px] border-orange-500 text-orange-500">Risk Guard</Badge>
+                                )}
+                                {bot.risk_guard_level === "soft" && bot.status === "active" && (
+                                    <Badge className="text-[10px] bg-amber-500/20 text-amber-500 border-amber-500/30">Protegido</Badge>
+                                )}
                                 <span className={modeBadgeClass(Number(bot.leverage) > 1, "sm")}>
                                     {modeLabel(Number(bot.leverage) > 1)}
                                 </span>
@@ -1055,14 +1062,16 @@ export default function Show({
                         </CardContent>
                     </Card>
 
-                    {/* Risk Guard Status */}
-                    <Card className={riskGuard.is_triggered ? "border-destructive" : ""}>
+                    {/* Risk Guard Status v2 */}
+                    <Card className={riskGuard.level === "hard" ? "border-destructive" : riskGuard.level === "soft" ? "border-amber-500" : ""}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-sm">
                                 <Shield className="h-4 w-4" />
                                 Risk Guard
-                                {riskGuard.is_triggered ? (
-                                    <Badge variant="destructive" className="ml-auto text-[10px]">DISPARADO</Badge>
+                                {riskGuard.level === "hard" ? (
+                                    <Badge variant="destructive" className="ml-auto text-[10px]">HARD GUARD</Badge>
+                                ) : riskGuard.level === "soft" ? (
+                                    <Badge className="ml-auto text-[10px] bg-amber-500/20 text-amber-500 border-amber-500/30">PROTEGIDO</Badge>
                                 ) : (
                                     <Badge variant="outline" className="ml-auto text-[10px] border-green-500 text-green-500">ACTIVO</Badge>
                                 )}
@@ -1071,8 +1080,8 @@ export default function Show({
                         <CardContent className="space-y-0 divide-y">
                             {riskGuard.is_triggered && riskGuard.reason && (
                                 <div className="pb-3">
-                                    <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
-                                        <p className="text-sm font-medium text-destructive">{riskGuard.reason}</p>
+                                    <div className={`rounded-md p-3 border ${riskGuard.level === "soft" ? "bg-amber-500/10 border-amber-500/20" : "bg-destructive/10 border-destructive/20"}`}>
+                                        <p className={`text-sm font-medium ${riskGuard.level === "soft" ? "text-amber-500" : "text-destructive"}`}>{riskGuard.reason}</p>
                                         {riskGuard.triggered_at && (
                                             <p className="mt-1 text-xs text-muted-foreground">
                                                 {new Date(riskGuard.triggered_at).toLocaleString("es-AR")}
@@ -1081,13 +1090,42 @@ export default function Show({
                                     </div>
                                 </div>
                             )}
+                            {bot.status === "stopped" && riskGuard.stop_reason === "risk_guard" && (
+                                <div className="py-3 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-[10px] border-orange-500 text-orange-500">
+                                            Detenido por Risk Guard
+                                        </Badge>
+                                        {riskGuard.reentry_enabled && (
+                                            <Badge variant="outline" className="text-[10px] border-blue-500 text-blue-500">
+                                                Re-entry auto
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    {riskGuard.reentry_last_block_reason && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Último bloqueo: {riskGuard.reentry_last_block_reason}
+                                        </p>
+                                    )}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full gap-1.5 text-xs border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10"
+                                        onClick={() => router.post(`/bots/${bot.id}/reentry`)}
+                                    >
+                                        <RotateCcw className="h-3 w-3" /> Intentar re-entry
+                                    </Button>
+                                </div>
+                            )}
                             {[
-                                { label: "Max Drawdown", value: `${riskGuard.effective_config.max_drawdown_pct ?? 10}%` },
+                                { label: "Soft Guard", value: `${riskGuard.effective_config.soft_guard_drawdown_pct ?? 15}%` },
+                                { label: "Hard Guard", value: `${riskGuard.effective_config.hard_guard_drawdown_pct ?? 20}%` },
+                                { label: "Modo drawdown", value: (riskGuard.effective_config.drawdown_mode ?? "peak_equity_drawdown") === "initial_capital_loss" ? "S/ capital" : "Desde pico" },
+                                { label: "Acción hard", value: { stop_bot_only: "Detener", close_position_and_stop: "Cerrar + detener", pause_and_rebuild: "Pausar + rebuild", notify_only: "Solo notificar" }[riskGuard.effective_config.hard_guard_action ?? "stop_bot_only"] ?? "Detener" },
                                 { label: "Dist. mín. liquidación", value: `${riskGuard.effective_config.min_liquidation_distance_pct ?? 15}%` },
                                 { label: "Max fuera de rango", value: `${riskGuard.effective_config.max_price_out_of_range_pct ?? 5}%` },
-                                { label: "Max errores consecutivos", value: String(riskGuard.effective_config.max_consecutive_errors ?? 5) },
+                                { label: "Max errores", value: String(riskGuard.effective_config.max_consecutive_errors ?? 5) },
                                 { label: "Max rebuilds/hora", value: String(riskGuard.effective_config.max_grid_rebuilds_per_hour ?? 3) },
-                                { label: "Emergency stop", value: riskGuard.effective_config.emergency_stop ? "Sí" : "No" },
                             ].map((row) => (
                                 <div key={row.label} className="flex items-center justify-between py-2.5">
                                     <span className="text-sm text-muted-foreground">{row.label}</span>
