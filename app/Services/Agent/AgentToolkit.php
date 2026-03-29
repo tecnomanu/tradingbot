@@ -7,7 +7,9 @@ use App\Enums\AgentTrigger;
 use App\Enums\BotStatus;
 use App\Enums\OrderSide;
 use App\Enums\OrderStatus;
+use App\Models\AiConversation;
 use App\Models\Bot;
+use App\Models\BotActionLog;
 use App\Services\AiTradingAgent;
 use App\Services\BinanceApiService;
 use App\Services\BinanceFuturesService;
@@ -15,6 +17,7 @@ use App\Services\BotActivityLogger;
 use App\Services\BotService;
 use App\Services\GridTradingEngine;
 use App\Support\BotLog as Log;
+use Illuminate\Support\Facades\Cache;
 
 class AgentToolkit
 {
@@ -45,10 +48,10 @@ class AgentToolkit
     public function getToolDefinitions(): array
     {
         return [
-            $this->tool('get_bot_status', 'Bot config, PNL, grid, SL/TP, orders.', [
+            $this->tool('get_bot_status', 'Bot config, PNL, grid, SL/TP, orders, previous agent_state, recent interventions.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('get_market_data', 'Price, RSI, SMA, MACD, Bollinger, ATR.', [
+            $this->tool('get_market_data', 'Price, RSI, SMA, MACD, Bollinger, ATR, vol_ratio, external_context classification.', [
                 'symbol' => ['type' => 'string'],
             ]),
             $this->tool('get_open_orders', 'Open orders summary.', [
@@ -57,10 +60,14 @@ class AgentToolkit
             $this->tool('get_filled_orders', 'Recent fills + total PNL.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('get_binance_position', 'Live position data.', [
+            $this->tool('get_binance_position', 'Live position data including unrealized PNL and liquidation.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('set_stop_loss', 'Set SL price.', [
+            $this->tool('get_previous_consultations', 'Last N agent consultations: thesis, state, actions taken. Use to understand trajectory.', [
+                'bot_id' => ['type' => 'integer'],
+                'limit' => ['type' => 'integer', 'description' => 'Number of past consultations to fetch (1-5, default 3)'],
+            ]),
+            $this->tool('set_stop_loss', 'Set SL price. PROTECTION and RECONSTRUCTION states only.', [
                 'bot_id' => ['type' => 'integer'],
                 'price' => ['type' => 'number'],
             ]),
@@ -68,26 +75,58 @@ class AgentToolkit
                 'bot_id' => ['type' => 'integer'],
                 'price' => ['type' => 'number'],
             ]),
-            $this->tool('cancel_all_orders', 'Cancel all open orders.', [
+            $this->tool('cancel_all_orders', 'Cancel all open orders. RECONSTRUCTION state only.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('adjust_grid', 'Adjust grid range. Preferred over stop. Provide reason: price_outside_range, volatility_shift, trend_change, protection_mode, bot_recovery.', [
+            $this->tool('adjust_grid', 'Adjust grid range. Preferred over stop. RECONSTRUCTION state or emergency (0 open orders).', [
                 'bot_id' => ['type' => 'integer'],
                 'new_price_lower' => ['type' => 'number'],
                 'new_price_upper' => ['type' => 'number'],
                 'reason' => ['type' => 'string', 'description' => 'Why: price_outside_range | volatility_shift | trend_change | protection_mode | bot_recovery'],
             ]),
-            $this->tool('stop_bot', 'Stop bot. LAST RESORT.', [
+            $this->tool('stop_bot', 'Stop bot. ABSOLUTE LAST RESORT. Manual mode only. RETIRO state only.', [
                 'bot_id' => ['type' => 'integer'],
                 'reason' => ['type' => 'string'],
             ]),
-            $this->tool('close_position', 'Market-close position.', [
+            $this->tool('close_position', 'Market-close position. RETIRO or RECONSTRUCTION with extreme loss.', [
                 'bot_id' => ['type' => 'integer'],
             ]),
-            $this->tool('done', 'Finish: analysis (Spanish, 3-5 sentences, numbers) + summary (1 sentence).', [
-                'analysis' => ['type' => 'string'],
-                'summary' => ['type' => 'string'],
-            ]),
+            // done() has custom schema (not all params are required)
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'done',
+                    'description' => 'Finish consultation. Provide structured thesis (agent_state, trajectory, next_check_minutes) + JSON analysis + summary.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'agent_state' => [
+                                'type' => 'string',
+                                'enum' => ['favorable', 'vigilance', 'protection', 'reconstruction', 'retiro'],
+                                'description' => 'Resulting agent state from decision matrix',
+                            ],
+                            'trajectory' => [
+                                'type' => 'string',
+                                'enum' => ['improving', 'stable', 'deteriorating'],
+                                'description' => 'Trend of bot health over recent cycles',
+                            ],
+                            'next_check_minutes' => [
+                                'type' => 'integer',
+                                'description' => 'Suggested minutes until next consultation. favorable:60-120, vigilance:30-60, protection:15-30, reconstruction:10-15',
+                            ],
+                            'analysis' => [
+                                'type' => 'string',
+                                'description' => 'JSON string with structured thesis: regime, movement_quality, bot_state, market_state, agent_state, trajectory, external_context, action_taken, reason, narrative',
+                            ],
+                            'summary' => [
+                                'type' => 'string',
+                                'description' => '1 sentence in Spanish summarizing the decision and agent_state',
+                            ],
+                        ],
+                        'required' => ['agent_state', 'trajectory', 'analysis', 'summary'],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -123,13 +162,14 @@ class AgentToolkit
                 'get_open_orders' => $this->toolGetOpenOrders($bot),
                 'get_filled_orders' => $this->toolGetFilledOrders($bot, $args),
                 'get_binance_position' => $this->toolGetPosition($bot),
+                'get_previous_consultations' => $this->toolGetPreviousConsultations($bot, $args),
                 'set_stop_loss' => $this->toolSetStopLoss($bot, $args),
                 'set_take_profit' => $this->toolSetTakeProfit($bot, $args),
                 'adjust_grid' => $this->toolAdjustGrid($bot, $args),
                 'cancel_all_orders' => $this->toolCancelAllOrders($bot),
                 'stop_bot' => $this->toolStopBot($bot, $args),
                 'close_position' => $this->toolClosePosition($bot),
-                'done' => ['ok' => true, 'analysis' => $args['analysis'] ?? null],
+                'done' => $this->toolDone($bot, $args),
                 default => ['error' => "Unknown tool: {$name}"],
             };
         } catch (\Exception $e) {
@@ -142,12 +182,55 @@ class AgentToolkit
     {
         $symbol = $args['symbol'] ?? 'BTCUSDT';
         $data = $this->aiAgent->gatherMarketData($symbol);
-        return $data ?: ['error' => 'Could not fetch market data'];
+
+        if (!$data) {
+            return ['error' => 'Could not fetch market data'];
+        }
+
+        // Classify external context from market behavior (Ring 3 — no external feed needed)
+        $volRatio = (float) ($data['vol_ratio'] ?? 1.0);
+        $chg24h = abs((float) ($data['chg24h'] ?? 0));
+
+        if ($volRatio > 3.0 || ($volRatio > 2.5 && $chg24h > 5.0)) {
+            $externalContext = 'relevant_event';
+        } elseif ($volRatio > 2.0 || $chg24h > 3.0) {
+            $externalContext = 'uncertainty_rising';
+        } else {
+            $externalContext = 'neutral';
+        }
+
+        $data['external_context'] = $externalContext;
+
+        return $data;
     }
 
     private function toolGetBotStatus(Bot $bot): array
     {
         $bot->refresh();
+
+        $recentAgentActions = BotActionLog::where('bot_id', $bot->id)
+            ->where('source', 'agent')
+            ->where('created_at', '>=', now()->subHours(24))
+            ->count();
+
+        $totalPnl = (float) $bot->total_pnl;
+        $gridProfit = (float) $bot->grid_profit;
+        $trendPnl = (float) $bot->trend_pnl;
+
+        $pnlOrigin = 'none';
+        if ($totalPnl != 0) {
+            $gridRatio = $totalPnl > 0 ? ($gridProfit / $totalPnl) : 0;
+            if ($totalPnl < 0) {
+                $pnlOrigin = 'floating_loss';
+            } elseif ($gridRatio >= 0.7) {
+                $pnlOrigin = 'from_grid';
+            } elseif (abs($trendPnl) > abs($gridProfit)) {
+                $pnlOrigin = 'from_trend';
+            } else {
+                $pnlOrigin = 'mixed';
+            }
+        }
+
         return [
             'status' => $bot->status->value,
             'symbol' => $bot->symbol,
@@ -157,13 +240,18 @@ class AgentToolkit
             'upper' => (float) $bot->price_upper,
             'grids' => $bot->grid_count,
             'investment' => (float) $bot->investment,
-            'pnl' => (float) $bot->total_pnl,
-            'grid_profit' => (float) $bot->grid_profit,
+            'pnl' => $totalPnl,
+            'grid_profit' => $gridProfit,
+            'trend_pnl' => $trendPnl,
+            'pnl_origin' => $pnlOrigin,
             'rounds' => $bot->total_rounds,
             'sl' => $bot->stop_loss_price ? (float) $bot->stop_loss_price : null,
             'tp' => $bot->take_profit_price ? (float) $bot->take_profit_price : null,
             'open_orders' => $bot->orders()->where('status', OrderStatus::Open)->count(),
             'filled_orders' => $bot->orders()->where('status', OrderStatus::Filled)->count(),
+            'agent_state' => $bot->agent_state,
+            'agent_state_streak' => (int) $bot->agent_state_streak,
+            'recent_agent_actions_24h' => $recentAgentActions,
         ];
     }
 
@@ -197,6 +285,128 @@ class AgentToolkit
             }
         }
         return $gaps;
+    }
+
+    private function toolGetPreviousConsultations(Bot $bot, array $args): array
+    {
+        $limit = min((int) ($args['limit'] ?? 3), 5);
+        $limit = max($limit, 1);
+
+        $consultations = AiConversation::where('bot_id', $bot->id)
+            ->where('status', 'completed')
+            ->latest('ended_at')
+            ->limit($limit)
+            ->get(['id', 'ended_at', 'trigger', 'summary', 'analysis', 'actions_taken']);
+
+        return [
+            'count' => $consultations->count(),
+            'consultations' => $consultations->map(fn ($c) => [
+                'id' => $c->id,
+                'when' => $c->ended_at?->diffForHumans(),
+                'trigger' => $c->trigger,
+                'summary' => $c->summary,
+                'analysis' => $c->analysis,
+                'actions' => $c->actions_taken ?? [],
+            ])->toArray(),
+        ];
+    }
+
+    private function toolDone(Bot $bot, array $args): array
+    {
+        $proposedState = $args['agent_state'] ?? null;
+        $trajectory = $args['trajectory'] ?? 'stable';
+        $nextCheckMinutes = isset($args['next_check_minutes']) ? (int) $args['next_check_minutes'] : null;
+
+        $finalState = $this->applyInertiaAndPersist($bot, $proposedState, $trajectory, $nextCheckMinutes);
+
+        return [
+            'ok' => true,
+            'analysis' => $args['analysis'] ?? null,
+            'agent_state_applied' => $finalState,
+            'agent_state_proposed' => $proposedState,
+            'inertia_blocked' => ($finalState !== $proposedState),
+        ];
+    }
+
+    /**
+     * Apply inertia logic and persist agent state + next consultation time.
+     * State transitions require 2 consecutive observations (pending confirmation).
+     * Returns the final confirmed state.
+     */
+    private function applyInertiaAndPersist(Bot $bot, ?string $proposedState, string $trajectory, ?int $nextCheckMinutes): ?string
+    {
+        if (!$proposedState) {
+            return $bot->agent_state;
+        }
+
+        $confirmedState = $bot->agent_state;
+
+        // First consultation: no inertia needed, set directly
+        if ($confirmedState === null) {
+            $updates = [
+                'agent_state' => $proposedState,
+                'agent_state_streak' => 1,
+            ];
+            if ($nextCheckMinutes > 0) {
+                $updates['ai_next_consultation_at'] = now()->addMinutes($nextCheckMinutes);
+            }
+            $bot->update($updates);
+            $bot->refresh();
+            return $proposedState;
+        }
+
+        // Same state as confirmed: increment streak, no transition
+        if ($proposedState === $confirmedState) {
+            $updates = ['agent_state_streak' => min((int) $bot->agent_state_streak + 1, 100)];
+            if ($nextCheckMinutes > 0) {
+                $updates['ai_next_consultation_at'] = now()->addMinutes($nextCheckMinutes);
+            }
+            $bot->update($updates);
+            $bot->refresh();
+            return $confirmedState;
+        }
+
+        // Different state proposed: check pending confirmation via Cache
+        $pendingKey = "agent_state_pending.{$bot->id}";
+        $pendingState = Cache::get($pendingKey);
+
+        if ($pendingState === $proposedState) {
+            // Second consecutive proposal for the same new state: CONFIRM transition
+            Cache::forget($pendingKey);
+            $updates = [
+                'agent_state' => $proposedState,
+                'agent_state_streak' => 0,
+            ];
+            if ($nextCheckMinutes > 0) {
+                $updates['ai_next_consultation_at'] = now()->addMinutes($nextCheckMinutes);
+            }
+            $bot->update($updates);
+            $bot->refresh();
+
+            Log::info('AgentToolkit: state transition confirmed (inertia)', [
+                'bot_id' => $bot->id,
+                'from' => $confirmedState,
+                'to' => $proposedState,
+                'trajectory' => $trajectory,
+            ]);
+
+            return $proposedState;
+        }
+
+        // First proposal for a new state: store as pending, block transition
+        Cache::put($pendingKey, $proposedState, now()->addMinutes(90));
+        if ($nextCheckMinutes > 0) {
+            $bot->update(['ai_next_consultation_at' => now()->addMinutes($nextCheckMinutes)]);
+        }
+
+        Log::info('AgentToolkit: state transition pending (inertia block)', [
+            'bot_id' => $bot->id,
+            'confirmed' => $confirmedState,
+            'proposed' => $proposedState,
+            'trajectory' => $trajectory,
+        ]);
+
+        return $confirmedState;
     }
 
     private function toolGetFilledOrders(Bot $bot, array $args): array

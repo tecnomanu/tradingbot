@@ -58,6 +58,9 @@ class Bot extends Model
         'rounds_24h',
         'started_at',
         'stopped_at',
+        'agent_state',
+        'agent_state_streak',
+        'ai_next_consultation_at',
     ];
 
     protected $casts = [
@@ -93,6 +96,8 @@ class Bot extends Model
         'rounds_24h' => 'integer',
         'started_at' => 'datetime',
         'stopped_at' => 'datetime',
+        'agent_state_streak' => 'integer',
+        'ai_next_consultation_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

@@ -70,6 +70,12 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
             return false;
         }
 
+        // Dynamic frequency: use ai_next_consultation_at if the agent set it
+        if ($bot->ai_next_consultation_at !== null) {
+            return now()->gte($bot->ai_next_consultation_at);
+        }
+
+        // Fallback: static interval from bot config
         $lastSuccess = AiConversation::where('bot_id', $bot->id)
             ->where('status', 'completed')
             ->where('total_tokens', '>', 0)
