@@ -84,7 +84,7 @@ class Bot extends Model
         'total_fees' => 'decimal:4',
         'trend_pnl' => 'decimal:4',
         'ai_consultation_interval' => 'integer',
-        'ai_agent_enabled' => 'boolean',
+        // ai_agent_enabled: handled by getAiAgentEnabledAttribute (null = true)
         'ai_notify_telegram' => 'boolean',
         'ai_notify_events' => 'array',
         'risk_config' => 'array',
@@ -99,6 +99,12 @@ class Bot extends Model
         'agent_state_streak' => 'integer',
         'ai_next_consultation_at' => 'datetime',
     ];
+
+    // null in DB means enabled (backwards-compatible default)
+    public function getAiAgentEnabledAttribute(mixed $value): bool
+    {
+        return $value !== false && $value !== 0 && $value !== '0';
+    }
 
     public function user(): BelongsTo
     {
