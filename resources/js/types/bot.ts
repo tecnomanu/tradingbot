@@ -39,6 +39,7 @@ export interface Bot {
     rounds_24h: number;
     stop_loss_price: number | null;
     take_profit_price: number | null;
+    ai_agent_enabled: boolean;
     ai_system_prompt: string | null;
     ai_user_prompt: string | null;
     ai_consultation_interval: number;

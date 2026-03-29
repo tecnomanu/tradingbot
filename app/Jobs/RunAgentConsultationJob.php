@@ -60,9 +60,12 @@ class RunAgentConsultationJob implements ShouldQueue, ShouldBeUnique
 
     private function shouldConsult(Bot $bot): bool
     {
+        if (!$bot->ai_agent_enabled) {
+            return false;
+        }
+
         $intervalMinutes = (int) $bot->ai_consultation_interval;
 
-        // 0 or no prompt = agent disabled for this bot
         if ($intervalMinutes <= 0 || empty($bot->ai_system_prompt)) {
             return false;
         }

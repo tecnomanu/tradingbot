@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { router } from "@inertiajs/react";
-import { Brain, CheckCircle, FlaskConical, Loader2, Save } from "lucide-react";
+import { Brain, CheckCircle, FlaskConical, Loader2, Save, PowerOff } from "lucide-react";
 import { useState } from "react";
 
 const PERSONALITY_PRESETS: Record<string, { label: string; description: string; prompt: string }> = {
@@ -46,6 +46,7 @@ function detectPreset(prompt: string | null): string {
 
 export default function AiPromptConfig({ bot }: { bot: Bot }) {
     const detectedPreset = detectPreset(bot.ai_system_prompt);
+    const [agentEnabled, setAgentEnabled] = useState(bot.ai_agent_enabled ?? true);
     const [activePreset, setActivePreset] = useState(detectedPreset);
     const [customPrompt, setCustomPrompt] = useState(bot.ai_system_prompt ?? "");
     const [userPrompt, setUserPrompt] = useState(bot.ai_user_prompt ?? "");
@@ -68,6 +69,10 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
             setShowCustom(false);
             setCustomPrompt(PERSONALITY_PRESETS[preset]?.prompt ?? "");
         } else {
+            // Only clear if switching FROM a preset (not already in custom mode)
+            if (!showCustom) {
+                setCustomPrompt("");
+            }
             setShowCustom(true);
         }
         setSaved(false);
@@ -79,8 +84,9 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
         router.put(
             `/ai-agent/bots/${bot.id}/prompts`,
             {
-                ai_system_prompt: currentPrompt,
-                ai_user_prompt: userPrompt || null,
+                ai_agent_enabled: agentEnabled,
+                ai_system_prompt: agentEnabled ? (currentPrompt || null) : null,
+                ai_user_prompt: agentEnabled ? (userPrompt || null) : null,
                 ai_consultation_interval: interval,
                 ai_notify_telegram: notifyTelegram,
                 ai_notify_events: notifyEvents,
@@ -88,6 +94,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
             {
                 preserveScroll: true,
                 onSuccess: () => setSaved(true),
+                onError: () => setSaved(false),
                 onFinish: () => setSaving(false),
             },
         );
@@ -141,6 +148,35 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                     </p>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    {/* Agent enabled/disabled toggle */}
+                    <div className={`flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
+                        !agentEnabled ? "border-destructive/60 bg-destructive/5" : "border-border"
+                    }`}>
+                        <div className="flex items-center gap-2">
+                            <PowerOff className={`h-4 w-4 ${!agentEnabled ? "text-destructive" : "text-muted-foreground"}`} />
+                            <div>
+                                <div className="font-medium text-sm">Agente AI</div>
+                                <div className="text-xs text-muted-foreground">
+                                    {agentEnabled ? "Activo — el bot consulta el agente periódicamente" : "Desactivado — el bot opera sin consultar el agente"}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={agentEnabled}
+                            onClick={() => { setAgentEnabled(!agentEnabled); setSaved(false); }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                agentEnabled ? "bg-primary" : "bg-destructive/70"
+                            }`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                agentEnabled ? "translate-x-6" : "translate-x-1"
+                            }`} />
+                        </button>
+                    </div>
+
+                    {agentEnabled && (
                     <div className="space-y-3">
                         <Label>Estilo de Trading</Label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -173,8 +209,9 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                             <div className="text-xs text-muted-foreground mt-1">Escribí tu propia personalidad y reglas de trading.</div>
                         </button>
                     </div>
+                    )}
 
-                    {showCustom && (
+                    {agentEnabled && showCustom && (
                         <div className="space-y-2">
                             <Label htmlFor="custom-prompt">Personalidad personalizada</Label>
                             <Textarea
@@ -191,6 +228,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                         </div>
                     )}
 
+                    {agentEnabled && (
                     <div className="space-y-2">
                         <Label htmlFor="user-prompt">Mensaje Inicial</Label>
                         <Textarea
@@ -205,7 +243,9 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                             El mensaje que recibe el agente en cada consulta. Variables: <code className="text-xs bg-muted px-1 rounded">{"{bot_id}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{symbol}"}</code>, <code className="text-xs bg-muted px-1 rounded">{"{now}"}</code>
                         </p>
                     </div>
+                    )}
 
+                    {agentEnabled && (
                     <div className="space-y-2">
                         <Label>Intervalo de consulta</Label>
                         <div className="flex flex-wrap gap-2">
@@ -228,6 +268,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                             Cada cuánto el agente AI revisa este bot automáticamente.
                         </p>
                     </div>
+                    )}
 
                     <hr className="border-border" />
 
@@ -297,7 +338,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                             {saving ? "Guardando..." : "Guardar"}
                         </Button>
-                        <Button onClick={handleTest} disabled={testing} variant="secondary" className="gap-1.5">
+                        <Button onClick={handleTest} disabled={testing || !agentEnabled} variant="secondary" className="gap-1.5">
                             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
                             {testing ? "Analizando..." : "Test con IA"}
                         </Button>

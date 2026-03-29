@@ -87,6 +87,10 @@ class AiAgentController extends Controller
             ->where('user_id', $request->user()->id)
             ->firstOrFail();
 
+        if (!$bot->ai_agent_enabled) {
+            return back()->with('error', 'El agente está desactivado para este bot.');
+        }
+
         $orchestrator = app(AgentOrchestrator::class);
         $conversation = $orchestrator->consult($bot, AgentTrigger::Manual);
 
@@ -104,6 +108,7 @@ class AiAgentController extends Controller
         abort_unless($bot->user_id === $request->user()->id, 403);
 
         $data = $request->validate([
+            'ai_agent_enabled' => 'nullable|boolean',
             'ai_system_prompt' => 'nullable|string|max:5000',
             'ai_user_prompt' => 'nullable|string|max:2000',
             'ai_consultation_interval' => 'nullable|integer|in:5,10,15,30,60',
@@ -113,6 +118,7 @@ class AiAgentController extends Controller
         ]);
 
         $bot->update([
+            'ai_agent_enabled' => $data['ai_agent_enabled'] ?? true,
             'ai_system_prompt' => $data['ai_system_prompt'] ?: null,
             'ai_user_prompt' => $data['ai_user_prompt'] ?: null,
             'ai_consultation_interval' => $data['ai_consultation_interval'] ?? 15,
