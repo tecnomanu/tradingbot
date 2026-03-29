@@ -50,6 +50,12 @@ import AgentImpactPanel from "./components/AgentImpactPanel";
 import BotHealthPanel, { type BotHealth } from "./components/BotHealthPanel";
 import { Head, Link, router } from "@inertiajs/react";
 import {
+    Tooltip as UITooltip,
+    TooltipContent as UITooltipContent,
+    TooltipProvider as UITooltipProvider,
+    TooltipTrigger as UITooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
     Activity,
     ArrowLeft,
     Bot as BotIcon,
@@ -193,6 +199,20 @@ export default function Show({
                                         {marginTypeLabel(bot.margin_type)}
                                     </span>
                                 )}
+                                <UITooltipProvider delayDuration={150}>
+                                    <UITooltip>
+                                        <UITooltipTrigger asChild>
+                                            <span className="inline-flex cursor-help">
+                                                <Brain className={`h-4 w-4 ${bot.ai_agent_enabled ? "text-emerald-400" : "text-muted-foreground/35"}`} />
+                                            </span>
+                                        </UITooltipTrigger>
+                                        <UITooltipContent side="bottom" className="text-xs">
+                                            {bot.ai_agent_enabled
+                                                ? `Agente AI activo — consulta cada ${bot.ai_consultation_interval} min`
+                                                : "Agente AI desactivado"}
+                                        </UITooltipContent>
+                                    </UITooltip>
+                                </UITooltipProvider>
                             </div>
                             <p className="text-sm text-muted-foreground">
                                 {bot.name} · Creado {formatDate(bot.created_at)}

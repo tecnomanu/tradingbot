@@ -26,7 +26,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Bot as BotIcon, Eye, Pencil, Play, Square } from "lucide-react";
+import { AlertCircle, Bot as BotIcon, Brain, Eye, Pencil, Play, Square } from "lucide-react";
 import { useState } from "react";
 
 interface BotTableProps {
@@ -180,6 +180,23 @@ function BotRow({ bot }: { bot: Bot }) {
                             <span className={sideBadgeClass(bot.side)}>
                                 {sideLabel(bot.side)}
                             </span>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="inline-flex cursor-help">
+                                        <Brain className={cn(
+                                            "h-3 w-3",
+                                            bot.ai_agent_enabled
+                                                ? "text-emerald-400"
+                                                : "text-muted-foreground/40"
+                                        )} />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                    {bot.ai_agent_enabled
+                                        ? `Agente AI activo — consulta cada ${bot.ai_consultation_interval} min`
+                                        : "Agente AI desactivado"}
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
                     </div>
                 </div>
