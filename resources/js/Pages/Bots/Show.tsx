@@ -1361,7 +1361,7 @@ export default function Show({
                 </TabsContent>
 
                 <TabsContent value="ai" className="space-y-4">
-                    <AiPromptConfig bot={bot} />
+                    <AiPromptConfig key={`${bot.id}_${bot.ai_system_prompt?.slice(0, 20) ?? 'null'}_${bot.ai_agent_enabled}`} bot={bot} />
                 </TabsContent>
 
                 <TabsContent value="historial" className="space-y-4">

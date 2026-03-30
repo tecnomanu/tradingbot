@@ -57,6 +57,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
     const [testing, setTesting] = useState(false);
     const [review, setReview] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
     const [showCustom, setShowCustom] = useState(detectedPreset === "custom");
 
     const currentPrompt = showCustom
@@ -81,6 +82,7 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
     const handleSave = () => {
         setSaving(true);
         setSaved(false);
+        setSaveError(null);
         router.put(
             `/ai-agent/bots/${bot.id}/prompts`,
             {
@@ -93,8 +95,12 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
             },
             {
                 preserveScroll: true,
-                onSuccess: () => setSaved(true),
-                onError: () => setSaved(false),
+                onSuccess: () => { setSaved(true); setSaveError(null); },
+                onError: (errors) => {
+                    setSaved(false);
+                    const msgs = Object.values(errors).flat().join(" · ");
+                    setSaveError(msgs || "Error al guardar. Revisá los campos.");
+                },
                 onFinish: () => setSaving(false),
             },
         );
@@ -333,19 +339,26 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
                         )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Button onClick={handleSave} disabled={saving} className="gap-1.5">
-                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            {saving ? "Guardando..." : "Guardar"}
-                        </Button>
-                        <Button onClick={handleTest} disabled={testing || !agentEnabled} variant="secondary" className="gap-1.5">
-                            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-                            {testing ? "Analizando..." : "Test con IA"}
-                        </Button>
-                        {saved && (
-                            <span className="flex items-center gap-1 text-sm text-emerald-400">
-                                <CheckCircle className="h-4 w-4" /> Guardado
-                            </span>
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+                                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                {saving ? "Guardando..." : "Guardar"}
+                            </Button>
+                            <Button onClick={handleTest} disabled={testing || !agentEnabled} variant="secondary" className="gap-1.5">
+                                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+                                {testing ? "Analizando..." : "Test con IA"}
+                            </Button>
+                            {saved && (
+                                <span className="flex items-center gap-1 text-sm text-emerald-400">
+                                    <CheckCircle className="h-4 w-4" /> Guardado
+                                </span>
+                            )}
+                        </div>
+                        {saveError && (
+                            <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-3 py-2">
+                                {saveError}
+                            </p>
                         )}
                     </div>
                 </CardContent>
