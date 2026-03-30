@@ -219,13 +219,18 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
 
                     {agentEnabled && showCustom && (
                         <div className="space-y-2">
-                            <Label htmlFor="custom-prompt">Personalidad personalizada</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="custom-prompt">Personalidad personalizada</Label>
+                                <span className={`text-[10px] tabular-nums ${customPrompt.length > 18000 ? "text-destructive" : "text-muted-foreground"}`}>
+                                    {customPrompt.length.toLocaleString()} / 20 000
+                                </span>
+                            </div>
                             <Textarea
                                 id="custom-prompt"
                                 value={customPrompt}
-                                onChange={(e) => { setCustomPrompt(e.target.value); setSaved(false); }}
+                                onChange={(e) => { setCustomPrompt(e.target.value); setSaved(false); setSaveError(null); }}
                                 placeholder="You are a crypto grid trading bot supervisor..."
-                                rows={8}
+                                rows={12}
                                 className="font-mono text-sm"
                             />
                             <p className="text-xs text-muted-foreground">
@@ -236,13 +241,18 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
 
                     {agentEnabled && (
                     <div className="space-y-2">
-                        <Label htmlFor="user-prompt">Mensaje Inicial</Label>
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="user-prompt">Mensaje Inicial</Label>
+                            <span className={`text-[10px] tabular-nums ${userPrompt.length > 4500 ? "text-destructive" : "text-muted-foreground"}`}>
+                                {userPrompt.length.toLocaleString()} / 5 000
+                            </span>
+                        </div>
                         <Textarea
                             id="user-prompt"
                             value={userPrompt}
-                            onChange={(e) => { setUserPrompt(e.target.value); setSaved(false); }}
+                            onChange={(e) => { setUserPrompt(e.target.value); setSaved(false); setSaveError(null); }}
                             placeholder={DEFAULT_USER_PROMPT}
-                            rows={3}
+                            rows={4}
                             className="font-mono text-sm"
                         />
                         <p className="text-xs text-muted-foreground">

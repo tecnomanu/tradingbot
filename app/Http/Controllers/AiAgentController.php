@@ -109,8 +109,8 @@ class AiAgentController extends Controller
 
         $data = $request->validate([
             'ai_agent_enabled' => 'nullable|boolean',
-            'ai_system_prompt' => 'nullable|string|max:5000',
-            'ai_user_prompt' => 'nullable|string|max:2000',
+            'ai_system_prompt' => 'nullable|string|max:20000',
+            'ai_user_prompt' => 'nullable|string|max:5000',
             'ai_consultation_interval' => 'nullable|integer|in:5,10,15,30,60',
             'ai_notify_telegram' => 'nullable|boolean',
             'ai_notify_events' => 'nullable|array',
@@ -134,8 +134,8 @@ class AiAgentController extends Controller
         abort_unless($bot->user_id === $request->user()->id, 403);
 
         $data = $request->validate([
-            'ai_system_prompt' => 'nullable|string|max:5000',
-            'ai_user_prompt' => 'nullable|string|max:2000',
+            'ai_system_prompt' => 'nullable|string|max:20000',
+            'ai_user_prompt' => 'nullable|string|max:5000',
         ]);
 
         $personality = $data['ai_system_prompt'] ?: AgentOrchestrator::defaultPersonality();
