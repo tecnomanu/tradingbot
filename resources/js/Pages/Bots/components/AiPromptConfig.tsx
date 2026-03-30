@@ -37,10 +37,10 @@ const INTERVAL_OPTIONS = [
 
 function detectPreset(prompt: string | null): string {
     if (!prompt) return "moderate";
-    const lower = prompt.toLowerCase();
-    if (lower.includes("aggressive") || lower.includes("agresivo")) return "aggressive";
-    if (lower.includes("cautious") || lower.includes("conservative") || lower.includes("conservador")) return "conservative";
-    if (lower.includes("moderate") || lower.includes("moderado") || lower.includes("balanced")) return "moderate";
+    // Only match a preset when the stored text is exactly that preset's prompt
+    for (const [key, preset] of Object.entries(PERSONALITY_PRESETS)) {
+        if (prompt.trim() === preset.prompt.trim()) return key;
+    }
     return "custom";
 }
 
@@ -70,9 +70,13 @@ export default function AiPromptConfig({ bot }: { bot: Bot }) {
             setShowCustom(false);
             setCustomPrompt(PERSONALITY_PRESETS[preset]?.prompt ?? "");
         } else {
-            // Only clear if switching FROM a preset (not already in custom mode)
             if (!showCustom) {
-                setCustomPrompt("");
+                // Pre-fill with the currently saved DB prompt so the user
+                // doesn't lose their text when switching to custom mode
+                const savedIsPreset = Object.values(PERSONALITY_PRESETS).some(
+                    (p) => (bot.ai_system_prompt ?? "").trim() === p.prompt.trim()
+                );
+                setCustomPrompt(savedIsPreset ? "" : (bot.ai_system_prompt ?? ""));
             }
             setShowCustom(true);
         }
