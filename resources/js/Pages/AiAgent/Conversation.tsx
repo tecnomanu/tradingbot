@@ -91,15 +91,6 @@ function ToolResultDisplay({
         );
     }
 
-    if (!isLong) {
-        return (
-            <div className="mt-2 flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                <pre className="flex-1 overflow-auto text-xs text-muted-foreground">{str}</pre>
-            </div>
-        );
-    }
-
     return (
         <div className="mt-2">
             <button
@@ -111,7 +102,7 @@ function ToolResultDisplay({
                 <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
             </button>
             {open && (
-                <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted/30 p-2 text-xs text-muted-foreground">
+                <pre className="mt-1 max-h-48 overflow-x-auto overflow-y-auto rounded bg-muted/30 p-2 text-xs text-muted-foreground">
                     {str}
                 </pre>
             )}
@@ -144,13 +135,13 @@ function CollapsibleJson({
                         {label} ({str.length} chars)
                     </button>
                     {open && (
-                        <pre className="mt-1 max-h-60 overflow-auto rounded bg-muted/30 p-2 text-xs text-muted-foreground">
+                        <pre className="mt-1 max-h-60 overflow-x-auto overflow-y-auto rounded bg-muted/30 p-2 text-xs text-muted-foreground">
                             {str}
                         </pre>
                     )}
                 </>
             ) : (
-                <pre className="rounded bg-muted/30 p-2 text-xs text-muted-foreground">
+                <pre className="overflow-x-auto rounded bg-muted/30 p-2 text-xs text-muted-foreground">
                     {str}
                 </pre>
             )}
@@ -195,10 +186,10 @@ function AnalysisDisplay({ analysis, compact = false }: { analysis: string | nul
     };
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0">
             {/* State badges */}
             {keyFields.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5 max-w-full">
                     {keyFields.map(([k, v]) => (
                         <span
                             key={k}
@@ -241,7 +232,7 @@ function AnalysisDisplay({ analysis, compact = false }: { analysis: string | nul
                     Ver JSON completo
                 </button>
                 {open && (
-                    <pre className="mt-1.5 max-h-60 overflow-auto rounded bg-muted/20 p-2 text-xs text-muted-foreground leading-relaxed">
+                    <pre className="mt-1.5 max-h-60 overflow-x-auto overflow-y-auto rounded bg-muted/20 p-2 text-xs text-muted-foreground leading-relaxed">
                         {JSON.stringify(parsed, null, 2)}
                     </pre>
                 )}
@@ -317,6 +308,11 @@ function TimelineStep({
                     ].includes(toolName);
                     const ToolIcon = isDone ? CheckCircle2 : isAction ? Shield : Wrench;
 
+                    // For done tool, hide analysis/summary from the compact header (shown below in AnalysisDisplay)
+                    const headerArgs = isDone
+                        ? Object.fromEntries(Object.entries(args).filter(([k]) => !["analysis", "summary"].includes(k)))
+                        : args;
+
                     return (
                         <div
                             key={i}
@@ -328,7 +324,7 @@ function TimelineStep({
                                       : "bg-muted/10"
                             }`}
                         >
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                                 <ToolIcon
                                     className={`h-4 w-4 shrink-0 ${
                                         isDone ? "text-primary" : isAction ? "text-yellow-400" : "text-muted-foreground"
@@ -337,9 +333,9 @@ function TimelineStep({
                                 <span className="font-mono text-sm font-medium">
                                     {toolName}
                                 </span>
-                                {Object.keys(args).length > 0 && (
-                                    <span className="text-xs text-muted-foreground font-normal">
-                                        {formatArgsCompact(args)}
+                                {Object.keys(headerArgs).length > 0 && (
+                                    <span className="text-xs text-muted-foreground font-normal truncate max-w-[60%]">
+                                        {formatArgsCompact(headerArgs)}
                                     </span>
                                 )}
                                 {isAction && (
