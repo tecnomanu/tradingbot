@@ -510,12 +510,26 @@ PROMPT;
 
             $isThinkingModel = str_contains($this->model, 'qwen') || str_contains($this->model, 'deepseek');
 
-            // When forceDone=true, require a tool call but keep all tools available
-            // so the model can still choose action tools (adjust_grid, etc.) or done().
-            // tool_choice=required prevents the model from returning an empty stop
-            // response, which is what Qwen3 does with /no_think on the analysis turn.
-            $tools = $this->toolkit->getToolDefinitions();
-            $toolChoice = $forceDone ? 'required' : 'auto';
+            // Determine tool set and tool_choice based on conversation phase:
+            // - Data phase (no tool results yet): all tools, auto → model picks data tools
+            // - Analysis phase (tool results present): action+done only, required → no empty stop
+            // - ForceDone retry: done only, required → guaranteed completion
+            // Removing data tools in analysis phase shrinks the payload (13→7 tools),
+            // which avoids the Groq/WAF block observed with full tool list + tool results.
+            $allTools = $this->toolkit->getToolDefinitions();
+            $hasToolResults = collect($messages)->contains(fn($m) => ($m['role'] ?? '') === 'tool');
+            $dataToolNames = ['get_bot_status', 'get_market_data', 'get_open_orders', 'get_filled_orders', 'get_binance_position', 'get_previous_consultations'];
+
+            if ($forceDone) {
+                $tools = array_values(array_filter($allTools, fn($t) => ($t['function']['name'] ?? '') === 'done'));
+                $toolChoice = 'required';
+            } elseif ($hasToolResults) {
+                $tools = array_values(array_filter($allTools, fn($t) => !in_array($t['function']['name'] ?? '', $dataToolNames)));
+                $toolChoice = 'required';
+            } else {
+                $tools = $allTools;
+                $toolChoice = 'auto';
+            }
 
             $payload = [
                 'model' => $this->model,
