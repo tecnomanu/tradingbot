@@ -9,6 +9,7 @@ import {
     Brain,
     CheckCircle2,
     ChevronDown,
+    ChevronRight,
     Clock,
     MessageSquare,
     Shield,
@@ -157,6 +158,98 @@ function CollapsibleJson({
     );
 }
 
+/** Parse the agent's analysis field (JSON string or object) and display it
+ *  in a readable way: reason + narrative as prose, collapsible raw JSON below. */
+function AnalysisDisplay({ analysis, compact = false }: { analysis: string | null | undefined; compact?: boolean }) {
+    const [open, setOpen] = useState(false);
+
+    if (!analysis) return null;
+
+    let parsed: Record<string, any> | null = null;
+    try {
+        parsed = typeof analysis === "string" ? JSON.parse(analysis) : analysis;
+    } catch {
+        // Not valid JSON — just show as plain text
+        return <p className={`leading-relaxed text-foreground ${compact ? "text-xs" : "text-sm"}`}>{analysis}</p>;
+    }
+
+    const reason = parsed?.reason as string | undefined;
+    const narrative = parsed?.narrative as string | undefined;
+
+    // Key badges to show inline (excluding prose fields)
+    const keyFields: Array<[string, string]> = [
+        ["regime", parsed?.regime],
+        ["bot_state", parsed?.bot_state],
+        ["market_state", parsed?.market_state],
+        ["agent_state", parsed?.agent_state],
+        ["trajectory", parsed?.trajectory],
+        ["action_taken", parsed?.action_taken],
+    ].filter(([, v]) => v != null) as Array<[string, string]>;
+
+    const stateColor = (val: string) => {
+        if (["favorable", "improving", "none", "clean"].includes(val)) return "text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
+        if (["vigilance", "watchful", "stable", "lateral_clean"].includes(val)) return "text-blue-400 bg-blue-500/10 border-blue-500/30";
+        if (["protection", "fragile", "deteriorating"].includes(val)) return "text-yellow-400 bg-yellow-500/10 border-yellow-500/30";
+        if (["reconstruction", "retiro", "inviable", "incompatible"].includes(val)) return "text-red-400 bg-red-500/10 border-red-500/30";
+        return "text-muted-foreground bg-muted/30 border-border";
+    };
+
+    return (
+        <div className="space-y-2">
+            {/* State badges */}
+            {keyFields.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                    {keyFields.map(([k, v]) => (
+                        <span
+                            key={k}
+                            className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium ${stateColor(v)}`}
+                        >
+                            <span className="opacity-60">{k}:</span> {v}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {/* reason — main justification */}
+            {reason && (
+                <p className={`leading-relaxed text-foreground ${compact ? "text-xs" : "text-sm"}`}>
+                    {reason}
+                </p>
+            )}
+
+            {/* narrative — descriptive paragraph */}
+            {narrative && (
+                <p className={`leading-relaxed text-muted-foreground italic ${compact ? "text-xs" : "text-sm"}`}>
+                    {narrative}
+                </p>
+            )}
+
+            {/* Fallback if neither reason nor narrative */}
+            {!reason && !narrative && (
+                <p className={`leading-relaxed text-foreground ${compact ? "text-xs" : "text-sm"}`}>
+                    {analysis}
+                </p>
+            )}
+
+            {/* Collapsible raw JSON */}
+            <div>
+                <button
+                    onClick={() => setOpen((o) => !o)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                >
+                    {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    Ver JSON completo
+                </button>
+                {open && (
+                    <pre className="mt-1.5 max-h-60 overflow-auto rounded bg-muted/20 p-2 text-xs text-muted-foreground leading-relaxed">
+                        {JSON.stringify(parsed, null, 2)}
+                    </pre>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function TimelineStep({
     step,
     messages,
@@ -260,11 +353,17 @@ function TimelineStep({
                                 <ToolResultDisplay result={result} isError={!!isError} />
                             )}
                             {isDone && (args.analysis || args.summary) && (
-                                <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
-                                    <p className="text-xs font-medium text-primary mb-1.5">Análisis final</p>
-                                    <p className="text-sm leading-relaxed text-foreground">
-                                        {args.analysis || args.summary}
-                                    </p>
+                                <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+                                    <p className="text-xs font-medium text-primary">Análisis final</p>
+                                    {args.analysis
+                                        ? <AnalysisDisplay analysis={args.analysis} compact />
+                                        : <p className="text-sm leading-relaxed text-foreground">{args.summary}</p>
+                                    }
+                                    {args.summary && args.analysis && (
+                                        <p className="text-xs text-muted-foreground border-t border-primary/10 pt-2 italic">
+                                            {args.summary}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -388,18 +487,16 @@ export default function ConversationView({
                 {/* Analysis & Summary Card */}
                 {(conversation.analysis || conversation.summary) && (
                     <Card className="border-primary/20 bg-primary/5">
-                        <CardContent className="p-4 space-y-2">
+                        <CardContent className="p-4 space-y-3">
                             <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
                                 <Brain className="h-3.5 w-3.5" />
                                 Análisis del Agente
                             </div>
                             {conversation.analysis && (
-                                <p className="text-sm leading-relaxed text-foreground">
-                                    {conversation.analysis}
-                                </p>
+                                <AnalysisDisplay analysis={conversation.analysis} />
                             )}
                             {conversation.summary && (
-                                <p className="text-xs text-muted-foreground italic">
+                                <p className="text-xs text-muted-foreground border-t border-primary/10 pt-2 italic">
                                     {conversation.summary}
                                 </p>
                             )}
