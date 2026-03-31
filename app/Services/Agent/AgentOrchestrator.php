@@ -535,7 +535,9 @@ PROMPT;
 
             if (!empty($msg['content'])) {
                 $stripped = trim(preg_replace('/<think>.*?(<\/think>|$)/s', '', $msg['content']));
-                $msg['content'] = $stripped;
+                // Normalize empty string to null so tool_calls messages don't get
+                // content:"" which Groq rejects when persisted back into the next call.
+                $msg['content'] = $stripped !== '' ? $stripped : null;
             }
 
             // If thinking model consumed all tokens on <think> with no tools
@@ -580,7 +582,8 @@ PROMPT;
 
             if (isset($msg['tool_calls'])) {
                 $apiMsg['tool_calls'] = $msg['tool_calls'];
-                if (!isset($apiMsg['content'])) {
+                // OpenAI spec: assistant with tool_calls must have content=null, not ""
+                if (!isset($apiMsg['content']) || $apiMsg['content'] === '') {
                     $apiMsg['content'] = null;
                 }
             }
