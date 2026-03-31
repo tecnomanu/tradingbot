@@ -486,9 +486,10 @@ PROMPT;
                 'tools' => $this->toolkit->getToolDefinitions(),
                 'tool_choice' => 'auto',
                 'temperature' => $isThinkingModel ? 0.6 : 0.2,
-                // Thinking models (qwen, deepseek) use ~1500 tokens on <think> alone;
-                // 2048 left no room for tool calls, causing empty responses.
-                'max_tokens' => $isThinkingModel ? 4096 : 2048,
+                // Thinking models (qwen, deepseek) spend 3k-8k tokens on <think> chains;
+                // 4096 left no room for tool calls on the second iteration (done()), causing
+                // empty responses and "Agent did not complete analysis".
+                'max_tokens' => $isThinkingModel ? 16384 : 2048,
             ];
 
             $response = Http::withHeaders([
