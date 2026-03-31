@@ -326,6 +326,11 @@ PROMPT;
 
         for ($i = 0; $i < self::MAX_ITERATIONS; $i++) {
             Log::info("AgentOrchestrator: iteration {$i}, messages=" . count($messages));
+
+            // After tool results are available, force done() if the model returns empty.
+            // Qwen3/DeepSeek with /no_think can return finish_reason=stop with no output
+            // on the analysis turn; forcing done() guarantees the model produces a result.
+            $hasToolResults = collect($messages)->contains(fn($m) => ($m['role'] ?? '') === 'tool');
             $response = $this->callLlm($messages);
 
             if (!$response) {
@@ -333,8 +338,19 @@ PROMPT;
                     'message_count' => count($messages),
                     'total_tokens_so_far' => $this->totalTokens,
                     'model' => $this->model,
+                    'has_tool_results' => $hasToolResults,
                 ]);
-                break;
+
+                // If we already have tool results but the model failed to produce done(),
+                // retry once with tool_choice=done to force the analysis response.
+                if ($hasToolResults) {
+                    Log::info("AgentOrchestrator: forcing done() after empty response with tool results");
+                    $response = $this->callLlm($messages, forceDone: true);
+                }
+
+                if (!$response) {
+                    break;
+                }
             }
 
             Log::info("AgentOrchestrator: iteration {$i} got response", [
@@ -486,7 +502,7 @@ PROMPT;
         return $results;
     }
 
-    private function callLlm(array $messages): ?array
+    private function callLlm(array $messages, bool $forceDone = false): ?array
     {
         try {
             // Build the API messages (clean format for OpenAI-compatible API)
@@ -494,11 +510,17 @@ PROMPT;
 
             $isThinkingModel = str_contains($this->model, 'qwen') || str_contains($this->model, 'deepseek');
 
+            // When forceDone=true we constrain tool_choice to done() so the model cannot
+            // return an empty stop response; this handles Qwen3 /no_think edge cases.
+            $toolChoice = $forceDone
+                ? ['type' => 'function', 'function' => ['name' => 'done']]
+                : 'auto';
+
             $payload = [
                 'model' => $this->model,
                 'messages' => $apiMessages,
                 'tools' => $this->toolkit->getToolDefinitions(),
-                'tool_choice' => 'auto',
+                'tool_choice' => $toolChoice,
                 'temperature' => $isThinkingModel ? 0.6 : 0.2,
                 // Thinking models (qwen, deepseek) spend 3k-8k tokens on <think> chains;
                 // 4096 left no room for tool calls on the second iteration (done()), causing
