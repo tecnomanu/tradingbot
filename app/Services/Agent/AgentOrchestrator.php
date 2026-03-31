@@ -303,11 +303,21 @@ PROMPT;
     private function interpolateUserPrompt(string $template, Bot $bot): string
     {
         $now = now()->format('M j H:i');
-        return str_replace(
+        $prompt = str_replace(
             ['{bot_id}', '{symbol}', '{now}'],
             [$bot->id, $bot->symbol, $now],
             $template,
         );
+
+        // Prepend /no_think for Qwen3/DeepSeek thinking models to disable
+        // extended reasoning chains; without it, <think> tags consume the
+        // entire max_tokens budget before the done() tool call can be made.
+        $isThinkingModel = str_contains($this->model, 'qwen') || str_contains($this->model, 'deepseek');
+        if ($isThinkingModel) {
+            $prompt = '/no_think ' . $prompt;
+        }
+
+        return $prompt;
     }
 
     private function runAgentLoop(AiConversation $conversation, Bot $bot, array &$messages): array
@@ -319,7 +329,11 @@ PROMPT;
             $response = $this->callLlm($messages);
 
             if (!$response) {
-                Log::warning("AgentOrchestrator: LLM returned null at iteration {$i}");
+                Log::warning("AgentOrchestrator: LLM returned null at iteration {$i}", [
+                    'message_count' => count($messages),
+                    'total_tokens_so_far' => $this->totalTokens,
+                    'model' => $this->model,
+                ]);
                 break;
             }
 
