@@ -510,16 +510,19 @@ PROMPT;
 
             $isThinkingModel = str_contains($this->model, 'qwen') || str_contains($this->model, 'deepseek');
 
-            // When forceDone=true we constrain tool_choice to done() so the model cannot
-            // return an empty stop response; this handles Qwen3 /no_think edge cases.
-            $toolChoice = $forceDone
-                ? ['type' => 'function', 'function' => ['name' => 'done']]
-                : 'auto';
+            // When forceDone=true, expose only the done() tool and require it.
+            // tool_choice:{type:function,name:done} is not universally supported
+            // on Groq; using 'required' with a single-tool list is more portable.
+            $allTools = $this->toolkit->getToolDefinitions();
+            $tools = $forceDone
+                ? array_values(array_filter($allTools, fn($t) => ($t['function']['name'] ?? '') === 'done'))
+                : $allTools;
+            $toolChoice = $forceDone ? 'required' : 'auto';
 
             $payload = [
                 'model' => $this->model,
                 'messages' => $apiMessages,
-                'tools' => $this->toolkit->getToolDefinitions(),
+                'tools' => $tools,
                 'tool_choice' => $toolChoice,
                 'temperature' => $isThinkingModel ? 0.6 : 0.2,
                 // Thinking models (qwen, deepseek) spend 3k-8k tokens on <think> chains;
