@@ -511,6 +511,12 @@ PROMPT;
                 'Content-Type' => 'application/json',
             ])->timeout(45)->post($this->apiUrl, $payload);
 
+            Log::info('AgentOrchestrator: LLM call made', [
+                'status' => $response->status(),
+                'message_count' => count($apiMessages),
+                'successful' => $response->successful(),
+            ]);
+
             if (!$response->successful()) {
                 Log::error('AgentOrchestrator: LLM API error', [
                     'status' => $response->status(),
@@ -528,6 +534,13 @@ PROMPT;
                 logger()->error('LLM no choice in response: ' . substr(json_encode($data), 0, 500));
                 return null;
             }
+
+            Log::info('AgentOrchestrator: LLM response parsed', [
+                'finish_reason' => $choice['finish_reason'] ?? null,
+                'has_tool_calls' => !empty($choice['message']['tool_calls'] ?? []),
+                'content_len' => strlen($choice['message']['content'] ?? ''),
+                'tokens' => $data['usage']['total_tokens'] ?? 0,
+            ]);
 
             // Strip thinking tags from assistant content
             $msg = $choice['message'];
