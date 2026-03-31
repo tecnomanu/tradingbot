@@ -510,13 +510,11 @@ PROMPT;
 
             $isThinkingModel = str_contains($this->model, 'qwen') || str_contains($this->model, 'deepseek');
 
-            // When forceDone=true, expose only the done() tool and require it.
-            // tool_choice:{type:function,name:done} is not universally supported
-            // on Groq; using 'required' with a single-tool list is more portable.
-            $allTools = $this->toolkit->getToolDefinitions();
-            $tools = $forceDone
-                ? array_values(array_filter($allTools, fn($t) => ($t['function']['name'] ?? '') === 'done'))
-                : $allTools;
+            // When forceDone=true, require a tool call but keep all tools available
+            // so the model can still choose action tools (adjust_grid, etc.) or done().
+            // tool_choice=required prevents the model from returning an empty stop
+            // response, which is what Qwen3 does with /no_think on the analysis turn.
+            $tools = $this->toolkit->getToolDefinitions();
             $toolChoice = $forceDone ? 'required' : 'auto';
 
             $payload = [
