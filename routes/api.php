@@ -27,6 +27,7 @@ Route::prefix('v1')->middleware('api.key')->group(function () {
     // ------------------------------------------------------------------
     Route::prefix('bots')->group(function () {
         Route::get('/',          [BotApiController::class, 'index']);   // list all
+        Route::post('/',         [BotApiController::class, 'store']);   // create + start bot
         Route::get('/{bot}',     [BotApiController::class, 'show']);    // full detail
         Route::patch('/{bot}',   [BotApiController::class, 'update']);  // update config
         Route::post('/{bot}/start', [BotApiController::class, 'start']); // start bot

@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Constants\BinanceConstants;
+use App\Constants\GridConstants;
+use App\Enums\BotSide;
 use App\Enums\BotStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateBotRequest;
 use App\Http\Resources\BotSummaryResource;
 use App\Http\Resources\OrderResource;
+use App\Models\BinanceAccount;
 use App\Models\Bot;
 use App\Services\BotActivityLogger;
 use App\Services\BotService;
@@ -25,6 +29,56 @@ class BotApiController extends Controller
         private GridCalculatorService $gridCalculator,
         private PnlService $pnlService,
     ) {}
+
+    /**
+     * Create and start a new bot.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'binance_account_id' => 'required|exists:binance_accounts,id',
+            'name'               => 'required|string|max:255',
+            'symbol'             => 'required|string|in:' . implode(',', BinanceConstants::SUPPORTED_PAIRS),
+            'side'               => 'required|string|in:' . implode(',', array_column(BotSide::cases(), 'value')),
+            'price_lower'        => 'required|numeric|min:0',
+            'price_upper'        => 'required|numeric|gt:price_lower',
+            'grid_count'         => 'required|integer|min:' . GridConstants::MIN_GRIDS . '|max:' . GridConstants::MAX_GRIDS,
+            'investment'         => 'required|numeric|min:' . GridConstants::MIN_INVESTMENT,
+            'leverage'           => 'required|integer|min:' . GridConstants::MIN_LEVERAGE . '|max:' . GridConstants::MAX_LEVERAGE,
+            'stop_loss_price'    => 'nullable|numeric|min:0',
+            'take_profit_price'  => 'nullable|numeric|min:0',
+            'grid_mode'          => 'nullable|string|in:arithmetic,geometric',
+            'ai_agent_enabled'   => 'nullable|boolean',
+            'autostart'          => 'nullable|boolean',
+        ]);
+
+        $account = BinanceAccount::find($validated['binance_account_id']);
+        abort_if($account->user_id !== $request->user()->id, 403, 'Account not owned by user');
+
+        $validated['user_id']   = $request->user()->id;
+        $validated['grid_mode'] = $validated['grid_mode'] ?? 'arithmetic';
+
+        $bot = $this->botService->createBot($validated);
+
+        if (!is_null($validated['ai_agent_enabled'] ?? null)) {
+            $bot->update(['ai_agent_enabled' => $validated['ai_agent_enabled']]);
+        }
+
+        BotActivityLogger::logApiAction($bot, 'bot_created', $request->user(), [
+            'reason' => 'api_request',
+        ]);
+
+        if ($validated['autostart'] ?? true) {
+            $this->botService->startBot($bot);
+            BotActivityLogger::logApiAction($bot, 'bot_started', $request->user(), ['reason' => 'autostart']);
+        }
+
+        return $this->successResponse(
+            $this->formatBotSummary($bot->fresh()),
+            'Bot created' . (($validated['autostart'] ?? true) ? ' and started' : ''),
+            201
+        );
+    }
 
     /**
      * List all bots for the authenticated user.
