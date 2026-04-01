@@ -1141,7 +1141,7 @@ export default function Show({
                                 { label: "Soft Guard", value: `${riskGuard.effective_config.soft_guard_drawdown_pct ?? 15}%` },
                                 { label: "Hard Guard", value: `${riskGuard.effective_config.hard_guard_drawdown_pct ?? 20}%` },
                                 { label: "Modo drawdown", value: (riskGuard.effective_config.drawdown_mode ?? "peak_equity_drawdown") === "initial_capital_loss" ? "S/ capital" : "Desde pico" },
-                                { label: "Acción hard", value: { stop_bot_only: "Detener", close_position_and_stop: "Cerrar + detener", pause_and_rebuild: "Pausar + rebuild", notify_only: "Solo notificar" }[riskGuard.effective_config.hard_guard_action ?? "stop_bot_only"] ?? "Detener" },
+                                { label: "Acción hard", value: { stop_bot_only: "Detener", close_position_and_stop: "Cerrar + detener", pause_and_rebuild: "Pausar + rebuild", notify_only: "Solo notificar" }[riskGuard.effective_config.hard_guard_action ?? "pause_and_rebuild"] ?? "Pausar + rebuild" },
                                 { label: "Dist. mín. liquidación", value: `${riskGuard.effective_config.min_liquidation_distance_pct ?? 15}%` },
                                 { label: "Max fuera de rango", value: `${riskGuard.effective_config.max_price_out_of_range_pct ?? 5}%` },
                                 { label: "Max errores", value: String(riskGuard.effective_config.max_consecutive_errors ?? 5) },

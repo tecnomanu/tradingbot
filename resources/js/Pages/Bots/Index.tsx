@@ -90,8 +90,8 @@ export default function Index({
         drawdown_mode: "peak_equity_drawdown",
         soft_guard_drawdown_pct: "",
         hard_guard_drawdown_pct: "",
-        hard_guard_action: "stop_bot_only",
-        reentry_enabled: false,
+        hard_guard_action: "pause_and_rebuild",
+        reentry_enabled: true,
         reentry_cooldown_minutes: "60",
     });
 

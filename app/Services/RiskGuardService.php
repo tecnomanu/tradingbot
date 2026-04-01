@@ -16,7 +16,7 @@ class RiskGuardService
         'max_drawdown_pct' => 10.0,            // legacy — ignored when v2 keys present
         'soft_guard_drawdown_pct' => 15.0,
         'hard_guard_drawdown_pct' => 20.0,
-        'hard_guard_action' => 'stop_bot_only', // stop_bot_only | close_position_and_stop | pause_and_rebuild | notify_only
+        'hard_guard_action' => 'pause_and_rebuild', // stop_bot_only | close_position_and_stop | pause_and_rebuild | notify_only
         'drawdown_mode' => 'peak_equity_drawdown', // peak_equity_drawdown | initial_capital_loss
         'min_liquidation_distance_pct' => 15.0,
         'max_price_out_of_range_pct' => 5.0,
@@ -389,7 +389,9 @@ class RiskGuardService
 
         $peakPnl = (float) $peakPnl;
         $currentPnl = (float) $bot->total_pnl;
-        $investment = (float) $bot->real_investment;
+        // Use full user investment (not margin/real_investment) so that leverage
+        // does not artificially inflate the drawdown percentage.
+        $investment = (float) $bot->investment;
         $equityAtPeak = $investment + $peakPnl;
 
         if ($equityAtPeak <= 0) {
@@ -401,7 +403,9 @@ class RiskGuardService
 
     private function calcInitialCapitalLoss(Bot $bot): ?float
     {
-        $investment = (float) $bot->real_investment;
+        // Use full user investment (not margin/real_investment) so that leverage
+        // does not artificially inflate the drawdown percentage.
+        $investment = (float) $bot->investment;
         if ($investment <= 0) {
             return null;
         }

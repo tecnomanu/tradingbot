@@ -55,8 +55,17 @@ class BotApiController extends Controller
         $account = BinanceAccount::find($validated['binance_account_id']);
         abort_if($account->user_id !== $request->user()->id, 403, 'Account not owned by user');
 
-        $validated['user_id']   = $request->user()->id;
-        $validated['grid_mode'] = $validated['grid_mode'] ?? 'arithmetic';
+        $validated['user_id']        = $request->user()->id;
+        $validated['grid_mode']      = $validated['grid_mode'] ?? 'arithmetic';
+        $validated['reentry_enabled'] = $validated['reentry_enabled'] ?? true;
+
+        // Ensure pause_and_rebuild is the default hard_guard_action so that
+        // a RiskGuard stop automatically enables reentry on the bot.
+        if (empty($validated['risk_config'])) {
+            $validated['risk_config'] = [
+                'hard_guard_action' => 'pause_and_rebuild',
+            ];
+        }
 
         $bot = $this->botService->createBot($validated);
 
