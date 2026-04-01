@@ -49,6 +49,7 @@ import BotActivityLog, { type ActivityLogEntry } from "./components/BotActivityL
 import AgentImpactPanel from "./components/AgentImpactPanel";
 import BotHealthPanel, { type BotHealth } from "./components/BotHealthPanel";
 import { Head, Link, router } from "@inertiajs/react";
+import { MetricInfo } from "@/components/MetricInfo";
 import {
     Tooltip as UITooltip,
     TooltipContent as UITooltipContent,
@@ -402,43 +403,48 @@ export default function Show({
 
             {/* Stats Banner */}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 mb-6">
-                {[
+                {([
                     {
                         label: "Inversión real",
+                        info: "Capital depositado como margen en Binance. Puede diferir de la inversión configurada si el apalancamiento la divide.",
                         value: `${formatCurrency(bot.real_investment)} USDT`,
                     },
                     {
                         label: "PNL Neto Total",
+                        info: "Ganancia o pérdida total del bot: ganancia grid neta + PNL no realizado de la posición abierta.",
                         value: `${bot.total_pnl >= 0 ? "+" : ""}${formatCurrency(bot.total_pnl)} USDT`,
-                        color:
-                            bot.total_pnl >= 0
-                                ? "text-green-500"
-                                : "text-destructive",
+                        color: bot.total_pnl >= 0 ? "text-green-500" : "text-destructive",
                     },
                     {
                         label: "Grid Neto",
+                        info: "Ganancia de los ciclos compra/venta ejecutados dentro del rango, con comisiones ya descontadas.",
                         value: `${formatCurrency(bot.grid_profit)} USDT`,
                         color: "text-primary",
                     },
                     {
                         label: "Comisiones",
+                        info: "Total estimado de comisiones pagadas a Binance. Calculadas como 0.04% taker × 2 operaciones por ronda.",
                         value: `-${formatCurrency(bot.total_fees)} USDT`,
                         color: "text-orange-500",
                     },
                     {
                         label: "Rondas totales",
+                        info: "Cantidad de ciclos compra→venta completados desde que el bot fue activado.",
                         value: String(bot.total_rounds),
                     },
-                    { label: "Rondas 24h", value: String(bot.rounds_24h) },
-                ].map((stat, i) => (
+                    {
+                        label: "Rondas 24h",
+                        info: "Ciclos de compra→venta completados en las últimas 24 horas. Indica la actividad reciente del bot.",
+                        value: String(bot.rounds_24h),
+                    },
+                ] as { label: string; info: string; value: string; color?: string }[]).map((stat, i) => (
                     <Card key={i}>
                         <CardContent className="pt-4 pb-3 text-center">
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground flex items-center justify-center">
                                 {stat.label}
+                                <MetricInfo text={stat.info} side="bottom" />
                             </p>
-                            <p
-                                className={`mt-1 text-sm font-bold ${stat.color || ""}`}
-                            >
+                            <p className={`mt-1 text-sm font-bold ${stat.color || ""}`}>
                                 {stat.value}
                             </p>
                         </CardContent>
@@ -639,31 +645,46 @@ export default function Show({
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-6 text-xs">
-                                    {[
-                                        { label: "Tamaño", value: `${position.positionAmt} ${bot.symbol.replace("USDT", "")}` },
-                                        { label: "Entrada", value: `${formatCurrency(position.entryPrice, 2)} USDT` },
+                                    {([
+                                        {
+                                            label: "Tamaño",
+                                            info: "Cantidad de contratos actualmente abiertos en Binance para esta posición.",
+                                            value: `${position.positionAmt} ${bot.symbol.replace("USDT", "")}`,
+                                        },
+                                        {
+                                            label: "Entrada",
+                                            info: "Precio promedio al que se abrió la posición activa.",
+                                            value: `${formatCurrency(position.entryPrice, 2)} USDT`,
+                                        },
                                         {
                                             label: "PNL no realizado",
+                                            info: "Ganancia o pérdida flotante de la posición abierta, basada en el precio de mercado actual. Cambia segundo a segundo.",
                                             value: `${position.unrealizedProfit >= 0 ? "+" : ""}${formatCurrency(position.unrealizedProfit)} USDT`,
                                             color: position.unrealizedProfit >= 0 ? "text-green-500" : "text-destructive",
                                         },
                                         {
-                                            label: "Liq. price",
+                                            label: "Precio liq.",
+                                            info: "Precio al que Binance cerraría forzosamente esta posición para evitar pérdidas mayores al margen disponible.",
                                             value: position.liquidationPrice > 0 ? `${formatCurrency(position.liquidationPrice, 1)}` : "N/A",
                                         },
                                         {
                                             label: "Lado",
+                                            info: "LONG = el bot gana si el precio sube. SHORT = el bot gana si el precio baja.",
                                             value: position.positionAmt > 0 ? "LONG" : "SHORT",
                                             color: position.positionAmt > 0 ? "text-green-500" : "text-destructive",
                                         },
                                         {
                                             label: "Margen",
+                                            info: "Tipo de margen: Aislado (cada posición tiene su propio margen limitado) o Cruzado (comparte el balance total).",
                                             value: marginTypeLabel(position.marginType ?? bot.margin_type),
                                         },
-                                    ].map((item, i) => (
+                                    ] as { label: string; info: string; value: string; color?: string }[]).map((item, i) => (
                                         <div key={i} className="space-y-0.5">
-                                            <p className="text-muted-foreground">{item.label}</p>
-                                            <p className={`font-semibold tabular-nums ${(item as any).color || ""}`}>
+                                            <p className="text-muted-foreground flex items-center">
+                                                {item.label}
+                                                <MetricInfo text={item.info} side="top" />
+                                            </p>
+                                            <p className={`font-semibold tabular-nums ${item.color || ""}`}>
                                                 {item.value}
                                             </p>
                                         </div>
@@ -684,40 +705,39 @@ export default function Show({
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-4 sm:grid-cols-5 text-xs">
-                                {[
+                                {([
                                     {
                                         label: "Inversión real",
-                                        value: formatCurrency(
-                                            bot.real_investment,
-                                        ),
+                                        info: "Capital depositado como margen en Binance para este bot.",
+                                        value: formatCurrency(bot.real_investment),
                                     },
                                     {
                                         label: "Margen adic.",
-                                        value: formatCurrency(
-                                            bot.additional_margin,
-                                        ),
+                                        info: "Capital extra añadido manualmente para reducir el riesgo de liquidación.",
+                                        value: formatCurrency(bot.additional_margin),
                                     },
                                     {
                                         label: "Precio liq.",
-                                        value:
-                                            bot.est_liquidation_price > 0
-                                                ? formatCurrency(
-                                                      bot.est_liquidation_price,
-                                                  )
-                                                : "N/A",
+                                        info: "Precio al que Binance cerraría forzosamente la posición si las pérdidas consumen el margen disponible.",
+                                        value: bot.est_liquidation_price > 0
+                                            ? formatCurrency(bot.est_liquidation_price)
+                                            : "N/A",
                                     },
                                     {
                                         label: "Rango",
+                                        info: "Precio mínimo y máximo donde el bot coloca órdenes activas.",
                                         value: `${formatCurrency(bot.price_lower)} - ${formatCurrency(bot.price_upper)}`,
                                     },
                                     {
                                         label: "Rejillas",
+                                        info: "Cantidad de niveles de precio del grid. Más rejillas = órdenes más frecuentes pero con menor ganancia por ronda.",
                                         value: `${bot.grid_count} (${bot.profit_per_grid}%/rejilla)`,
                                     },
-                                ].map((item, i) => (
+                                ] as { label: string; info: string; value: string }[]).map((item, i) => (
                                     <div key={i} className="space-y-1">
-                                        <p className="text-muted-foreground">
+                                        <p className="text-muted-foreground flex items-center">
                                             {item.label}
+                                            <MetricInfo text={item.info} side="bottom" />
                                         </p>
                                         <p className="font-semibold tabular-nums text-foreground">
                                             {item.value}

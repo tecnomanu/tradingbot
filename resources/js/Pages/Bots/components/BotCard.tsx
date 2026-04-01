@@ -20,6 +20,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { MetricInfo } from "@/components/MetricInfo";
 import {
     Tooltip,
     TooltipContent,
@@ -85,16 +86,18 @@ export default function BotCard({ bot }: BotCardProps) {
                 <CardContent className="pb-3">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground flex items-center">
                                 Inversión real
+                                <MetricInfo text="Capital depositado como margen en Binance para operar este bot." side="bottom" />
                             </p>
                             <p className="text-lg font-bold">
                                 {formatCurrency(bot.real_investment)} USDT
                             </p>
                         </div>
                         <div className="text-right">
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground flex items-center justify-end">
                                 Beneficio total
+                                <MetricInfo text="PNL acumulado: ganancia de rejillas + PNL de posición abierta. Positivo = ganás, negativo = pérdida." side="bottom" />
                             </p>
                             <p
                                 className={`text-lg font-bold ${bot.total_pnl >= 0 ? "text-green-500" : "text-destructive"}`}
@@ -107,16 +110,18 @@ export default function BotCard({ bot }: BotCardProps) {
                     <Separator className="my-3" />
                     <div className="grid grid-cols-3 gap-3 text-center">
                         <div>
-                            <p className="text-xs text-muted-foreground">
-                                Grid profit
+                            <p className="text-xs text-muted-foreground flex items-center justify-center">
+                                Ganancia Grid
+                                <MetricInfo text="Ganancia generada por los ciclos de compra/venta completados dentro del rango. Ya descontadas las comisiones." side="bottom" />
                             </p>
                             <p className="text-sm font-semibold text-primary">
                                 {formatCurrency(bot.grid_profit)}
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground flex items-center justify-center">
                                 Rango
+                                <MetricInfo text="Precio mínimo y máximo donde el bot coloca órdenes. Si el precio sale de este rango, el bot deja de operar activamente." side="bottom" />
                             </p>
                             <p className="text-sm font-semibold">
                                 {formatCurrency(bot.price_lower, 0)}-
@@ -124,8 +129,9 @@ export default function BotCard({ bot }: BotCardProps) {
                             </p>
                         </div>
                         <div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground flex items-center justify-center">
                                 Rejillas / Rondas
+                                <MetricInfo text="Rejillas: niveles de precio donde se colocan órdenes. Rondas: ciclos completos de compra+venta ejecutados." side="bottom" />
                             </p>
                             <p className="text-sm font-semibold">
                                 {bot.grid_count} / {bot.total_rounds}

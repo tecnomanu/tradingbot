@@ -1,3 +1,4 @@
+import { MetricInfo } from "@/components/MetricInfo";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -70,8 +71,9 @@ export default function Positions({ positions }: PositionsProps) {
                                         {formatCurrency(totalInvestment)} USDT
                                     </span>
                                 </span>
-                                <span className="text-muted-foreground">
-                                    PNL total:{" "}
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                    PNL total:
+                                    <MetricInfo text="Suma de PNL de todas las posiciones: ganancia grid + PNL no realizado." side="bottom" />
                                     <span
                                         className={`font-bold ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
                                     >
@@ -168,60 +170,44 @@ export default function Positions({ positions }: PositionsProps) {
                                             {/* Stats Row 1 */}
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-3">
                                                 <div>
-                                                    <p className="text-muted-foreground mb-0.5">
+                                                    <p className="text-muted-foreground mb-0.5 flex items-center">
                                                         Inversión real
+                                                        <MetricInfo text="Capital depositado como margen en Binance para este bot." side="bottom" />
                                                     </p>
                                                     <p className="font-semibold tabular-nums">
-                                                        {formatCurrency(
-                                                            pos.investment,
-                                                        )}{" "}
-                                                        USDT
+                                                        {formatCurrency(pos.investment)} USDT
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-muted-foreground mb-0.5">
+                                                    <p className="text-muted-foreground mb-0.5 flex items-center">
                                                         PNL Total
+                                                        <MetricInfo text="Ganancia o pérdida total del bot: ganancia de rejillas + PNL no realizado de la posición abierta. Puede diferir de la Ganancia Grid porque incluye el movimiento del precio." side="bottom" />
                                                     </p>
-                                                    <p
-                                                        className={`font-bold tabular-nums ${Number(pos.pnl) >= 0 ? "text-green-500" : "text-red-500"}`}
-                                                    >
+                                                    <p className={`font-bold tabular-nums ${Number(pos.pnl) >= 0 ? "text-green-500" : "text-red-500"}`}>
                                                         <span className="sr-only">{Number(pos.pnl) >= 0 ? "Ganancia" : "Pérdida"}:</span>
-                                                        {Number(pos.pnl) >= 0
-                                                            ? "+"
-                                                            : ""}
-                                                        {formatCurrency(
-                                                            pos.pnl,
-                                                        )}{" "}
-                                                        USDT (
+                                                        {Number(pos.pnl) >= 0 ? "+" : ""}
+                                                        {formatCurrency(pos.pnl)} USDT (
                                                         {pnlPct >= 0 ? "+" : ""}
                                                         {pnlPct.toFixed(2)}%)
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-muted-foreground mb-0.5">
+                                                    <p className="text-muted-foreground mb-0.5 flex items-center">
                                                         Ganancia Grid
+                                                        <MetricInfo text="Ganancia real generada por los ciclos de compra/venta completados dentro del rango. No incluye el PNL de posición abierta." side="bottom" />
                                                     </p>
                                                     <p className="font-semibold tabular-nums text-primary">
-                                                        {formatCurrency(
-                                                            pos.grid_profit,
-                                                        )}{" "}
-                                                        USDT
+                                                        {formatCurrency(pos.grid_profit)} USDT
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-muted-foreground mb-0.5">
+                                                    <p className="text-muted-foreground mb-0.5 flex items-center">
                                                         Trend PNL
+                                                        <MetricInfo text="PNL no realizado de la posición abierta en Binance. Es la diferencia entre el precio de entrada y el precio actual. Cambia constantemente." side="bottom" />
                                                     </p>
-                                                    <p
-                                                        className={`font-semibold tabular-nums ${pos.trend_pnl >= 0 ? "text-green-500" : "text-red-500"}`}
-                                                    >
-                                                        {pos.trend_pnl >= 0
-                                                            ? "+"
-                                                            : ""}
-                                                        {formatCurrency(
-                                                            pos.trend_pnl,
-                                                        )}{" "}
-                                                        USDT
+                                                    <p className={`font-semibold tabular-nums ${pos.trend_pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                                        {pos.trend_pnl >= 0 ? "+" : ""}
+                                                        {formatCurrency(pos.trend_pnl)} USDT
                                                     </p>
                                                 </div>
                                             </div>
