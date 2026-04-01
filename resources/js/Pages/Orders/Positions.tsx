@@ -59,9 +59,9 @@ export default function Positions({ positions }: PositionsProps) {
             <OrdersLayout>
                 <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-sm font-semibold">
+                        <h1 className="text-sm font-semibold">
                             Posiciones Activas ({positions.length})
-                        </h2>
+                        </h1>
                         {positions.length > 0 && (
                             <div className="flex items-center gap-4 text-xs">
                                 <span className="text-muted-foreground">

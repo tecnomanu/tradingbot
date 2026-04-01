@@ -190,7 +190,7 @@ export default function BotFormAdvanced({
                                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                                     />
                                     <span className="font-medium">
-                                        {data.symbol.replace("USDT", "/USDT")}{isFutures ? " Perp" : ""}
+                                        {data.symbol.replace("USDT", "/USDT")}{isFutures ? " Futuros" : ""}
                                     </span>
                                 </div>
                                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />

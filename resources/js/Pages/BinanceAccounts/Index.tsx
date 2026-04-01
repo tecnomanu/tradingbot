@@ -239,9 +239,9 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 mb-4">
                         <Key className="h-8 w-8 text-amber-500" />
                     </div>
-                    <h2 className="text-lg font-semibold">
+                    <h1 className="text-lg font-semibold">
                         Sin cuentas configuradas
-                    </h2>
+                    </h1>
                     <p className="mt-2 max-w-md text-sm text-muted-foreground">
                         Para operar con los grid bots necesitás una API Key de
                         Binance Futures. Creala en{" "}

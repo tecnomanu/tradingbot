@@ -185,12 +185,12 @@ export default function OrderHistory({
             <OrdersLayout>
                 <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-sm font-semibold">
+                        <h1 className="text-sm font-semibold">
                             Historial de Órdenes{" "}
                             {hasActiveFilters
                                 ? `(filtrado de ${orders.total} total)`
                                 : `(${orders.total})`}
-                        </h2>
+                        </h1>
                         <Button
                             variant="outline"
                             size="sm"

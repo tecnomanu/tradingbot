@@ -121,9 +121,9 @@ export default function Index({
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
                         <BotIcon className="h-8 w-8 text-primary" />
                     </div>
-                    <h2 className="text-xl font-semibold mb-2">
+                    <h1 className="text-xl font-semibold mb-2">
                         Bienvenido a tu Dashboard
-                    </h2>
+                    </h1>
                     <p className="text-muted-foreground max-w-sm mb-6">
                         Aún no tienes bots configurados. Crea tu primer bot de
                         grid trading para empezar a operar.

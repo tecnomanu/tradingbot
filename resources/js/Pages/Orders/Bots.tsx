@@ -46,9 +46,9 @@ export default function Bots({ activeBots, stoppedBots }: BotsPageProps) {
                     {/* Header */}
                     <div className="flex items-center justify-between border-b px-5 py-3">
                         <div className="flex items-center gap-4">
-                            <h2 className="text-sm font-semibold">
+                            <h1 className="text-sm font-semibold">
                                 Grid Bots
-                            </h2>
+                            </h1>
                             {activeBots.length > 0 && (
                                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                     <span>
