@@ -31,6 +31,20 @@ return Application::configure(basePath: dirname(__DIR__))
             fn ($request, \Throwable $e) => $request->is('api/*')
         );
 
+        // Render HTTP errors as Inertia pages for web routes
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, \Illuminate\Http\Request $request) {
+            if (!$request->is('api/*') && !$request->expectsJson() && in_array($e->getStatusCode(), [404, 500, 503])) {
+                try {
+                    return \Inertia\Inertia::render('Error', ['status' => $e->getStatusCode()])
+                        ->toResponse($request)
+                        ->setStatusCode($e->getStatusCode());
+                } catch (\Throwable) {
+                    return null; // fall through to default handler
+                }
+            }
+            return null;
+        });
+
         $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
             if (!$request->is('api/*')) {
                 return null; // let default handler deal with it

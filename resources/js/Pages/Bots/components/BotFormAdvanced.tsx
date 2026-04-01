@@ -764,6 +764,17 @@ export default function BotFormAdvanced({
 
             {/* CTA Button */}
             <div className="p-4 border-t mt-auto space-y-2">
+                {!canCalculate && !processing && (
+                    <p className="text-[11px] text-muted-foreground text-center">
+                        {!data.binance_account_id
+                            ? "Seleccioná una cuenta Binance para continuar."
+                            : !data.price_lower || !data.price_upper
+                              ? "Completá el rango de precios para continuar."
+                              : priceRangeInvalid
+                                ? "El precio superior debe ser mayor al precio inferior."
+                                : "Completá todos los campos para continuar."}
+                    </p>
+                )}
                 <Button
                     type="button"
                     onClick={onCalculate}

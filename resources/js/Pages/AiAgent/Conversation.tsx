@@ -412,6 +412,11 @@ export default function ConversationView({
                         </Button>
                     </Link>
                     <div className="flex-1">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                            <Link href="/ai-agent" className="hover:text-foreground transition-colors">Agente IA</Link>
+                            <span>/</span>
+                            <span>Consulta #{conversation.id}</span>
+                        </div>
                         <div className="flex items-center gap-2">
                             <h1 className="text-lg font-bold">
                                 Consulta #{conversation.id}
@@ -423,10 +428,10 @@ export default function ConversationView({
                                 variant="outline"
                                 className={statusColor}
                             >
-                                {conversation.status}
+                                {conversation.status === "completed" ? "completado" : conversation.status === "running" ? "en curso" : conversation.status}
                             </Badge>
                             <Badge variant="outline">
-                                {conversation.trigger}
+                                {conversation.trigger === "manual" ? "manual" : conversation.trigger === "scheduled" ? "programado" : conversation.trigger}
                             </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -442,7 +447,7 @@ export default function ConversationView({
                         <CardContent className="p-3">
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <MessageSquare className="h-3.5 w-3.5" />
-                                Tool calls
+                                Llamadas a herramientas
                             </div>
                             <p className="mt-1 text-xl font-bold tabular-nums">{conversation.total_tool_calls}</p>
                         </CardContent>
@@ -546,7 +551,7 @@ export default function ConversationView({
                             Pasos del Agente
                             <span className="text-xs font-normal text-muted-foreground">
                                 {steps.length} pasos ·{" "}
-                                {conversation.total_tool_calls} tool calls
+                                {conversation.total_tool_calls} llamadas a herramientas
                             </span>
                         </CardTitle>
                     </CardHeader>

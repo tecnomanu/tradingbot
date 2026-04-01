@@ -11,7 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 import { Check, Copy, RefreshCw } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface Props {
     apiKey: string;
@@ -24,6 +25,15 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
     const [rotating, setRotating] = useState(false);
     const [justRotated, setJustRotated] = useState(false);
     const [rotateDialogOpen, setRotateDialogOpen] = useState(false);
+    const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const AUTO_HIDE_MS = 30_000;
+
+    useEffect(() => {
+        return () => {
+            if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        };
+    }, []);
 
     const maskedKey = apiKey
         ? apiKey.substring(0, 8) + "•".repeat(Math.min(48, Math.max(0, apiKey.length - 12))) + apiKey.slice(-4)
@@ -35,21 +45,30 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
         setTimeout(() => setCopied(false), 2000);
     }, [apiKey]);
 
+    const showAndAutoHide = useCallback(() => {
+        setVisible(true);
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+            setVisible(false);
+            hideTimerRef.current = null;
+        }, AUTO_HIDE_MS);
+    }, []);
+
     const rotate = useCallback(async () => {
         setRotateDialogOpen(false);
         setRotating(true);
         try {
             const { data } = await axios.post(route("profile.rotate-api-key"));
             setApiKey(data.api_key);
-            setVisible(true);
+            showAndAutoHide();
             setJustRotated(true);
             setTimeout(() => setJustRotated(false), 5000);
         } catch {
-            alert("Error rotando la key. Intentá de nuevo.");
+            toast.error("Error rotando la key. Intentá de nuevo.");
         } finally {
             setRotating(false);
         }
-    }, []);
+    }, [showAndAutoHide]);
 
     return (
         <div className="space-y-4">
@@ -59,10 +78,17 @@ export default function ApiKeyManager({ apiKey: initialKey }: Props) {
                         Tu API Key
                     </p>
                     <button
-                        onClick={() => setVisible((v) => !v)}
+                        onClick={() => {
+                            if (!visible) {
+                                showAndAutoHide();
+                            } else {
+                                if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+                                setVisible(false);
+                            }
+                        }}
                         className="text-xs text-muted-foreground underline hover:text-foreground"
                     >
-                        {visible ? "Ocultar" : "Mostrar"}
+                        {visible ? "Ocultar" : "Mostrar (30 s)"}
                     </button>
                 </div>
 

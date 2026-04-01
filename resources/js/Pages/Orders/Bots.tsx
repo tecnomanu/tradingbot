@@ -142,7 +142,7 @@ function BotCard({ bot }: { bot: Bot }) {
                 <div className="flex items-center gap-2.5">
                     {isActive && (
                         <span className="relative flex h-2 w-2">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                            <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-green-400 opacity-75" />
                             <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
                         </span>
                     )}
@@ -151,7 +151,7 @@ function BotCard({ bot }: { bot: Bot }) {
                     )}
                     <img
                         src={`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${baseCoin}.png`}
-                        alt={baseCoin}
+                        alt=""
                         className="w-5 h-5 rounded-full"
                         onError={(e) => {
                             (e.target as HTMLImageElement).style.display =

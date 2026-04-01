@@ -55,7 +55,7 @@ export default function BotPreviewPanel({ data, className }: BotPreviewPanelProp
         )}>
             <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-semibold text-foreground">
-                    {isLive ? "Bot Info" : "Preview Bot"}
+                    {isLive ? "Info del bot" : "Vista previa"}
                 </span>
                 <button
                     onClick={() => setOpen(false)}

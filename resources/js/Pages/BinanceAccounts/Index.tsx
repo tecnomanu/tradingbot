@@ -384,7 +384,7 @@ export default function Index({ accounts }: BinanceAccountsProps) {
                                     ) : (
                                         <>
                                             <Wifi className="mr-2 h-3 w-3" />{" "}
-                                            Test
+                                            Probar conexión
                                         </>
                                     )}
                                 </Button>

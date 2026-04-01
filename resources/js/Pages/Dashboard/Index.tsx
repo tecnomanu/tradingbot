@@ -116,7 +116,7 @@ export default function Index({
     if (stats.total_bots === 0) {
         return (
             <AuthenticatedLayout>
-                <Head title="Dashboard" />
+                <Head title="Inicio" />
                 <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
                         <BotIcon className="h-8 w-8 text-primary" />
@@ -141,7 +141,7 @@ export default function Index({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Dashboard" />
+            <Head title="Inicio" />
             <div className="space-y-5">
                 {/* Row 1: Key Metrics */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -181,7 +181,7 @@ export default function Index({
                     <MiniStat
                         label="Órdenes"
                         value={`${extended.open_orders}`}
-                        sub={`abiertas · ${extended.filled_24h} exec 24h · ${extended.rounds_24h} rondas`}
+                        sub={`abiertas · ${extended.filled_24h} ejec. 24h · ${extended.rounds_24h} rondas`}
                         icon={ShoppingCart}
                         color="text-orange-500"
                         href="/orders/positions"
@@ -189,7 +189,7 @@ export default function Index({
                     <MiniStat
                         label="AI Agent"
                         value={`${extended.ai_conversations}`}
-                        sub={`consultas · ${extended.ai_actions} acciones · ${timeSinceCompact(extended.last_ai_consult)} ago`}
+                        sub={`consultas · ${extended.ai_actions} acciones · hace ${timeSinceCompact(extended.last_ai_consult)}`}
                         icon={Brain}
                         color="text-purple-500"
                         href="/ai-agent"
@@ -214,8 +214,8 @@ export default function Index({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-56">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div className="h-56 min-h-[1px]">
+                                    <ResponsiveContainer width="100%" height="100%" debounce={200}>
                                         <AreaChart data={pnlChart} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="dashPnl" x1="0" y1="0" x2="0" y2="1">
@@ -340,7 +340,7 @@ export default function Index({
                                                         {bot.symbol.replace("USDT", "")}
                                                     </div>
                                                     <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                                        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-green-400 opacity-75" />
                                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
                                                     </span>
                                                 </div>

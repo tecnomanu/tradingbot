@@ -360,7 +360,7 @@ export default function Show({
                         {isRunning ? (
                             hasRecentActivity ? (
                                 <span className="relative flex h-2.5 w-2.5">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                    <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-green-400 opacity-75" />
                                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
                                 </span>
                             ) : (
@@ -452,7 +452,7 @@ export default function Show({
                     <TabsTrigger value="envivo" className="gap-1.5">
                         <span className="relative flex h-2 w-2">
                             {isRunning && (
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-green-400 opacity-75" />
                             )}
                             <span className={`relative inline-flex h-2 w-2 rounded-full ${isRunning ? "bg-green-500" : "bg-muted-foreground"}`} />
                         </span>
@@ -466,7 +466,7 @@ export default function Show({
                     <TabsTrigger value="pnl">PNL</TabsTrigger>
                     <TabsTrigger value="ai" className="gap-1.5">
                         <Brain className="h-3.5 w-3.5" />
-                        AI Agent
+                        Agente IA
                     </TabsTrigger>
                     <TabsTrigger value="historial" className="gap-1.5">
                         <History className="h-3.5 w-3.5" />

@@ -91,7 +91,30 @@ interface Props {
     userBots: UserBot[];
 }
 
-const INCOMPLETE_ANALYSIS = "Agent did not complete analysis";
+const INCOMPLETE_ANALYSIS = "El agente no completó el análisis";
+
+const STATUS_LABELS: Record<string, string> = {
+    completed: "completado",
+    running: "en curso",
+    error: "error",
+    failed: "fallido",
+    scheduled: "programado",
+    pending: "pendiente",
+};
+
+const TRIGGER_LABELS: Record<string, string> = {
+    manual: "manual",
+    scheduled: "programado",
+    auto: "automático",
+};
+
+function statusLabel(s: string): string {
+    return STATUS_LABELS[s] ?? s;
+}
+
+function triggerLabel(t: string): string {
+    return TRIGGER_LABELS[t] ?? t;
+}
 
 function SectionDivider({ label }: { label: string }) {
     return (
@@ -177,7 +200,7 @@ export default function AiAgentIndex({
     return (
         <AuthenticatedLayout>
             <Toaster theme="system" richColors position="top-right" />
-            <Head title="AI Agent" />
+            <Head title="Agente IA" />
             <div className="mx-auto max-w-7xl space-y-6 p-4 text-foreground sm:p-6">
                 {/* Header */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -186,7 +209,7 @@ export default function AiAgentIndex({
                             <Brain className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">AI Trading Agent</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">Agente IA de Trading</h1>
                             <p className="text-sm text-muted-foreground">
                                 Supervisor inteligente con herramientas de trading
                             </p>
@@ -237,7 +260,7 @@ export default function AiAgentIndex({
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {[
                         { icon: MessageSquare, label: "Consultas", value: stats.total_conversations },
-                        { icon: Wrench, label: "Tool Calls", value: stats.total_tool_calls },
+                        { icon: Wrench, label: "Llamadas a herramientas", value: stats.total_tool_calls },
                         { icon: Shield, label: "Acciones", value: stats.total_actions },
                         {
                             icon: Clock,
@@ -270,7 +293,7 @@ export default function AiAgentIndex({
                         </TabsTrigger>
                         <TabsTrigger value="conversations" className="gap-1.5">
                             <MessageSquare className="h-3.5 w-3.5" />
-                            Conversaciones
+                            Historial de consultas
                         </TabsTrigger>
                     </TabsList>
 
@@ -405,7 +428,7 @@ export default function AiAgentIndex({
             <Dialog open={consultDialogOpen} onOpenChange={setConsultDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Consultar AI Agent</DialogTitle>
+                        <DialogTitle>Consultar Agente IA</DialogTitle>
                         <DialogDescription>
                             El agente revisará el estado del bot, analizará el mercado y tomará acciones si es necesario.
                         </DialogDescription>
@@ -561,9 +584,9 @@ function ConversationItem({ conv, highlight }: { conv: Conversation; highlight?:
                         }
                         className="text-[10px]"
                     >
-                        {conv.status}
+                        {statusLabel(conv.status)}
                     </Badge>
-                    <Badge variant="outline" className="text-[10px]">{conv.trigger}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{triggerLabel(conv.trigger)}</Badge>
                     {conv.model && (
                         <span className="text-[10px] text-muted-foreground">· {conv.model}</span>
                     )}
@@ -575,7 +598,7 @@ function ConversationItem({ conv, highlight }: { conv: Conversation; highlight?:
                     <p className="text-sm text-amber-400/90 italic">El agente no completó el análisis</p>
                 )}
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                    <span>{conv.total_tool_calls} tools</span>
+                    <span>{conv.total_tool_calls} herramientas</span>
                     <span>{conv.total_tokens} tokens</span>
                     {conv.duration_ms && <span>{(conv.duration_ms / 1000).toFixed(1)}s</span>}
                     {hasActions && (

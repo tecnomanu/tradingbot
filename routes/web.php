@@ -10,6 +10,7 @@ use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
+Route::redirect('/trading', '/bots');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard

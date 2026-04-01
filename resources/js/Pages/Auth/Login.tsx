@@ -46,7 +46,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             <Feature
                                 icon={BarChart3}
                                 title="Datos en tiempo real"
-                                desc="Charts, order book y precios en vivo"
+                                desc="Gráficos, libro de órdenes y precios en vivo"
                             />
                             <Feature
                                 icon={Shield}

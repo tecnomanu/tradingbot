@@ -1,12 +1,28 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
-import { Check, ClipboardCopy, ExternalLink, Key, Link2, Loader2, MessageCircle, Send, Unlink } from "lucide-react";
+import { Check, ClipboardCopy, ExternalLink, Key, Loader2, MessageCircle, Send, Unlink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface Props {
     chatId: string | null;
     connected: boolean;
+}
+
+function maskChatId(id: string): string {
+    if (id.length <= 4) return id;
+    return `****${id.slice(-4)}`;
 }
 
 export default function TelegramConfig({ chatId: initialChatId, connected: initialConnected }: Props) {
@@ -20,6 +36,7 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
     const [testing, setTesting] = useState(false);
     const [testSent, setTestSent] = useState(false);
     const [disconnecting, setDisconnecting] = useState(false);
+    const [disconnectOpen, setDisconnectOpen] = useState(false);
     const [manualMode, setManualMode] = useState(false);
     const [savingManual, setSavingManual] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -42,7 +59,7 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
             setLinkToken(data.token);
             setDeepLink(data.deep_link ?? `https://t.me/trading_wizardgpt_bot?start=${data.token}`);
         } catch {
-            alert("Error generando token de vinculación.");
+            toast.error("Error generando token de vinculación.");
         } finally {
             setLinking(false);
         }
@@ -66,10 +83,10 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
         try {
             const found = await doPoll();
             if (!found) {
-                alert("Aún no detectado. Asegurate de haber enviado /start con el código al bot y volvé a intentar.");
+                toast.info("Aún no detectado. Asegurate de haber enviado /start con el código al bot y volvé a intentar.");
             }
         } catch {
-            alert("Error verificando conexión.");
+            toast.error("Error verificando conexión.");
         } finally {
             setPolling(false);
         }
@@ -96,7 +113,7 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
             setConnected(true);
             setManualMode(false);
         } catch {
-            alert("Error guardando Chat ID.");
+            toast.error("Error guardando Chat ID.");
         } finally {
             setSavingManual(false);
         }
@@ -108,16 +125,15 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
         try {
             const { data } = await axios.post(route("telegram.test"));
             setTestSent(data.success);
-            if (!data.success) alert("No se pudo enviar. Verificá que el Chat ID sea correcto.");
+            if (!data.success) toast.error("No se pudo enviar. Verificá que el Chat ID sea correcto.");
         } catch {
-            alert("Error enviando mensaje de prueba.");
+            toast.error("Error enviando mensaje de prueba.");
         } finally {
             setTesting(false);
         }
     }, []);
 
-    const disconnect = useCallback(async () => {
-        if (!confirm("¿Desconectar Telegram? No recibirás más notificaciones.")) return;
+    const confirmDisconnect = useCallback(async () => {
         setDisconnecting(true);
         try {
             await axios.post(route("telegram.disconnect"));
@@ -125,16 +141,41 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
             setChatId("");
             setDeepLink(null);
             setLinkToken(null);
+            toast.success("Telegram desconectado.");
         } catch {
-            alert("Error desconectando.");
+            toast.error("Error desconectando.");
         } finally {
             setDisconnecting(false);
+            setDisconnectOpen(false);
         }
     }, []);
 
     if (connected) {
         return (
             <div className="space-y-4">
+                <AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>¿Desconectar Telegram?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                No recibirás más notificaciones de tus bots via Telegram.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmDisconnect}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                                {disconnecting ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : null}
+                                Desconectar
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 space-y-3">
                     <div className="flex items-center gap-2">
                         <Check className="h-5 w-5 text-emerald-500" />
@@ -145,12 +186,12 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
                     <p className="text-sm text-muted-foreground">
                         Chat ID:{" "}
                         <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">
-                            {chatId}
+                            {maskChatId(chatId)}
                         </code>
                     </p>
                     <p className="text-xs text-muted-foreground">
                         Activá las notificaciones en cada bot desde su pestaña
-                        AI Agent.
+                        Agente IA.
                     </p>
                     <div className="rounded border border-emerald-500/20 bg-muted/30 p-3 mt-2">
                         <p className="text-xs font-medium text-muted-foreground mb-2">
@@ -175,9 +216,14 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
                         {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                         {testing ? "Enviando..." : "Enviar prueba"}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={disconnect} disabled={disconnecting}
-                        className="gap-1.5 text-destructive hover:text-destructive">
-                        {disconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" />}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDisconnectOpen(true)}
+                        disabled={disconnecting}
+                        className="gap-1.5 text-destructive hover:text-destructive"
+                    >
+                        <Unlink className="h-3.5 w-3.5" />
                         Desconectar
                     </Button>
                     {testSent && (
@@ -198,7 +244,7 @@ export default function TelegramConfig({ chatId: initialChatId, connected: initi
                     <span className="font-medium">Vincular Telegram</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                    Conectá tu cuenta de Telegram para recibir notificaciones cuando el agente AI tome acciones en tus bots.
+                    Conectá tu cuenta de Telegram para recibir notificaciones cuando el agente IA tome acciones en tus bots.
                 </p>
 
                 {!deepLink && !manualMode ? (

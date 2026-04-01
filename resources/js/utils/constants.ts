@@ -21,10 +21,10 @@ export const LEVERAGE_OPTIONS = [
 ] as const;
 
 export const NAV_ITEMS = [
-    { label: "Dashboard", href: "/dashboard", routeName: "dashboard" },
-    { label: "Trading", href: "/bots", routeName: "bots.*" },
+    { label: "Inicio", href: "/dashboard", routeName: "dashboard" },
+    { label: "Operaciones", href: "/bots", routeName: "bots.*" },
     { label: "Actividad", href: "/orders/positions", routeName: "orders.*" },
-    { label: "AI Agent", href: "/ai-agent", routeName: "ai-agent.*" },
+    { label: "Agente IA", href: "/ai-agent", routeName: "ai-agent.*" },
     {
         label: "Cuentas",
         href: "/binance-accounts",

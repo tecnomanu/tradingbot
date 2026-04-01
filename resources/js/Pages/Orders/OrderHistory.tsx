@@ -61,18 +61,21 @@ function FilterSelect({
     options,
     onChange,
     label,
+    id,
 }: {
     value: string;
     options: { value: string; label: string }[];
     onChange: (val: string) => void;
     label: string;
+    id: string;
 }) {
     return (
         <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+            <label htmlFor={id} className="text-[11px] text-muted-foreground whitespace-nowrap">
                 {label}
-            </span>
+            </label>
             <select
+                id={id}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 className="h-7 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
@@ -101,23 +104,31 @@ function SortHeader({
     onSort: (field: string) => void;
 }) {
     const isActive = currentSort === field;
+    const ariaSort = isActive
+        ? currentDir === "asc"
+            ? ("ascending" as const)
+            : ("descending" as const)
+        : ("none" as const);
     return (
-        <th
-            className="pb-2 text-left font-medium cursor-pointer select-none hover:text-foreground transition-colors"
-            onClick={() => onSort(field)}
-        >
-            <span className="inline-flex items-center gap-1">
-                {label}
-                {isActive ? (
-                    currentDir === "asc" ? (
-                        <ArrowUp className="h-3 w-3" />
+        <th scope="col" aria-sort={ariaSort}>
+            <button
+                type="button"
+                className="pb-2 text-left font-medium cursor-pointer select-none hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => onSort(field)}
+            >
+                <span className="inline-flex items-center gap-1">
+                    {label}
+                    {isActive ? (
+                        currentDir === "asc" ? (
+                            <ArrowUp className="h-3 w-3" />
+                        ) : (
+                            <ArrowDown className="h-3 w-3" />
+                        )
                     ) : (
-                        <ArrowDown className="h-3 w-3" />
-                    )
-                ) : (
-                    <ArrowUpDown className="h-3 w-3 opacity-30" />
-                )}
-            </span>
+                        <ArrowUpDown className="h-3 w-3 opacity-30" />
+                    )}
+                </span>
+            </button>
         </th>
     );
 }
@@ -170,12 +181,12 @@ export default function OrderHistory({
 
     return (
         <AuthenticatedLayout fullWidth>
-            <Head title="Historial de Ordenes" />
+            <Head title="Historial de Órdenes" />
             <OrdersLayout>
                 <div className="p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-semibold">
-                            Historial de Ordenes{" "}
+                            Historial de Órdenes{" "}
                             {hasActiveFilters
                                 ? `(filtrado de ${orders.total} total)`
                                 : `(${orders.total})`}
@@ -194,24 +205,28 @@ export default function OrderHistory({
                     {/* Filters */}
                     <div className="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b">
                         <FilterSelect
+                            id="filter-status"
                             label="Estado"
                             value={filters.status}
                             options={STATUS_OPTIONS}
                             onChange={(v) => navigate({ status: v })}
                         />
                         <FilterSelect
+                            id="filter-lado"
                             label="Lado"
                             value={filters.side}
                             options={SIDE_OPTIONS}
                             onChange={(v) => navigate({ side: v })}
                         />
                         <FilterSelect
+                            id="filter-par"
                             label="Par"
                             value={filters.symbol}
                             options={symbolOptions}
                             onChange={(v) => navigate({ symbol: v })}
                         />
                         <FilterSelect
+                            id="filter-bot"
                             label="Bot"
                             value={filters.bot_id}
                             options={botOptions}
@@ -239,12 +254,13 @@ export default function OrderHistory({
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
+                                <caption className="sr-only">Historial de órdenes</caption>
                                 <thead>
                                     <tr className="border-b text-xs text-muted-foreground">
-                                        <th className="pb-2 text-left font-medium">
+                                        <th scope="col" className="pb-2 text-left font-medium">
                                             Par
                                         </th>
-                                        <th className="pb-2 text-left font-medium">
+                                        <th scope="col" className="pb-2 text-left font-medium">
                                             Bot
                                         </th>
                                         <SortHeader

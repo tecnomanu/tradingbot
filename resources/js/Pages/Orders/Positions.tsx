@@ -50,8 +50,8 @@ function timeRunning(dateStr: string | null): string {
 }
 
 export default function Positions({ positions }: PositionsProps) {
-    const totalPnl = positions.reduce((sum, p) => sum + p.pnl, 0);
-    const totalInvestment = positions.reduce((sum, p) => sum + p.investment, 0);
+    const totalPnl = positions.reduce((sum, p) => sum + Number(p.pnl), 0);
+    const totalInvestment = positions.reduce((sum, p) => sum + Number(p.investment), 0);
 
     return (
         <AuthenticatedLayout fullWidth>
@@ -114,12 +114,12 @@ export default function Positions({ positions }: PositionsProps) {
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="relative flex h-2 w-2">
-                                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                                        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-green-400 opacity-75" />
                                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
                                                     </span>
                                                     <img
                                                         src={`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${baseCoin}.png`}
-                                                        alt={baseCoin}
+                                                        alt=""
                                                         className="w-5 h-5 rounded-full"
                                                         onError={(e) => {
                                                             (
@@ -157,7 +157,8 @@ export default function Positions({ positions }: PositionsProps) {
                                                     </Badge>
                                                     <Link
                                                         href={`/bots/${pos.id}`}
-                                                        className="text-muted-foreground hover:text-foreground"
+                                                        aria-label={`Ver detalles del bot ${pos.symbol.replace("USDT", "/USDT")}`}
+                                                        className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                     >
                                                         <ArrowUpRight className="h-3.5 w-3.5" />
                                                     </Link>
@@ -165,7 +166,7 @@ export default function Positions({ positions }: PositionsProps) {
                                             </div>
 
                                             {/* Stats Row 1 */}
-                                            <div className="grid grid-cols-4 gap-3 text-xs mb-3">
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-3">
                                                 <div>
                                                     <p className="text-muted-foreground mb-0.5">
                                                         Inversión real
@@ -182,9 +183,10 @@ export default function Positions({ positions }: PositionsProps) {
                                                         PNL Total
                                                     </p>
                                                     <p
-                                                        className={`font-bold tabular-nums ${pos.pnl >= 0 ? "text-green-500" : "text-red-500"}`}
+                                                        className={`font-bold tabular-nums ${Number(pos.pnl) >= 0 ? "text-green-500" : "text-red-500"}`}
                                                     >
-                                                        {pos.pnl >= 0
+                                                        <span className="sr-only">{Number(pos.pnl) >= 0 ? "Ganancia" : "Pérdida"}:</span>
+                                                        {Number(pos.pnl) >= 0
                                                             ? "+"
                                                             : ""}
                                                         {formatCurrency(
@@ -225,7 +227,7 @@ export default function Positions({ positions }: PositionsProps) {
                                             </div>
 
                                             {/* Stats Row 2 */}
-                                            <div className="grid grid-cols-5 gap-3 text-[11px] text-muted-foreground border-t pt-2">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-[11px] text-muted-foreground border-t pt-2">
                                                 <div className="flex items-center gap-1">
                                                     <Grid3x3 className="h-3 w-3" />
                                                     <span>

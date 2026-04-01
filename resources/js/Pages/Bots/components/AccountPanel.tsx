@@ -66,7 +66,7 @@ export default function AccountPanel({
                         size="sm"
                         className="h-8 text-xs"
                     >
-                        Transfer
+                        Transferir
                     </Button>
                 </div>
             </div>

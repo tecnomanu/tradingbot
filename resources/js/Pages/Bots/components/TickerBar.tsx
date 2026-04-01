@@ -101,7 +101,7 @@ export default function TickerBar({ symbol, onPriceUpdate, onSymbolChange, isFut
                 <button className="flex items-center gap-2.5 shrink-0 group cursor-pointer hover:bg-muted/40 rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors">
                     <img
                         src={`https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${baseCoin.toLowerCase()}.png`}
-                        alt={baseCoin}
+                        alt=""
                         className="w-6 h-6 rounded-full"
                         onError={(e) => {
                             (e.target as HTMLImageElement).style.display = "none";
@@ -146,7 +146,7 @@ export default function TickerBar({ symbol, onPriceUpdate, onSymbolChange, isFut
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                           })
-                        : "---"}
+                        : <span className="motion-safe:animate-pulse">···</span>}
                 </span>
                 <span className="text-[10px] text-muted-foreground tabular-nums">
                     ≈ $
@@ -155,7 +155,7 @@ export default function TickerBar({ symbol, onPriceUpdate, onSymbolChange, isFut
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                           })
-                        : "---"}
+                        : <span className="motion-safe:animate-pulse">···</span>}
                 </span>
             </div>
 

@@ -30,10 +30,10 @@ export function formatTimestamp(date: Date): string {
 }
 
 export function timeSinceCompact(dateStr: string | null | undefined): string {
-    if (!dateStr) return "Nunca";
+    if (!dateStr) return "nunca";
     const ms = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(ms / 60000);
-    if (mins < 1) return "Ahora";
+    if (mins < 1) return "un momento";
     if (mins < 60) return `${mins}m`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h`;

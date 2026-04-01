@@ -12,8 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "@/utils/constants";
-import { Link, usePage } from "@inertiajs/react";
+import { NAV_ITEMS, ORDER_NAV_ITEMS } from "@/utils/constants";
+import { Link, router, usePage } from "@inertiajs/react";
 import { useEffect } from "react";
 import { Toaster, toast } from "sonner";
 import {
@@ -52,27 +52,58 @@ export default function AuthenticatedLayout({
 
     const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
         <>
-            {NAV_ITEMS.map((item) => (
-                <Link
-                    key={item.routeName}
-                    href={item.href}
-                    onClick={() => mobile && setMobileOpen(false)}
-                    className={cn(
-                        "inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        isActive(item.routeName)
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                    )}
-                >
-                    {item.label}
-                </Link>
-            ))}
+            {NAV_ITEMS.map((item) => {
+                const isActivityItem = item.routeName === "orders.*";
+                return (
+                    <div key={item.routeName}>
+                        <Link
+                            href={item.href}
+                            onClick={() => mobile && setMobileOpen(false)}
+                            className={cn(
+                                "inline-flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                isActive(item.routeName)
+                                    ? "bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                            )}
+                        >
+                            {item.label}
+                        </Link>
+                        {/* Sub-links of Actividad visible only in mobile nav */}
+                        {mobile && isActivityItem && (
+                            <div className="ml-4 flex flex-col gap-0.5 mt-0.5">
+                                {ORDER_NAV_ITEMS.map((sub) => (
+                                    <Link
+                                        key={sub.routeName}
+                                        href={sub.href}
+                                        onClick={() => setMobileOpen(false)}
+                                        className={cn(
+                                            "block rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                            isActive(sub.routeName)
+                                                ? "bg-primary/10 text-primary"
+                                                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                                        )}
+                                    >
+                                        {sub.label}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
         </>
     );
 
     return (
         <div className="min-h-screen bg-background">
             <Toaster theme="system" richColors position="top-right" />
+            {/* Skip link for keyboard users */}
+            <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+            >
+                Saltar al contenido
+            </a>
             {/* Top Navigation Bar */}
             <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex h-14 items-center gap-4 px-4 sm:px-6">
@@ -158,7 +189,7 @@ export default function AuthenticatedLayout({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
-                                className="w-56"
+                                className="w-56 bg-card"
                                 align="end"
                                 forceMount
                             >
@@ -192,16 +223,12 @@ export default function AuthenticatedLayout({
                                     </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                    <Link
-                                        href={route("logout")}
-                                        method="post"
-                                        as="button"
-                                        className="w-full cursor-pointer text-destructive focus:text-destructive"
-                                    >
-                                        <LogOut className="mr-2 h-4 w-4" />
-                                        Cerrar sesión
-                                    </Link>
+                                <DropdownMenuItem
+                                    className="cursor-pointer text-destructive focus:text-destructive"
+                                    onClick={() => router.post(route("logout"))}
+                                >
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    Cerrar sesión
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -218,6 +245,7 @@ export default function AuthenticatedLayout({
 
             {/* Main Content */}
             <main
+                id="main-content"
                 className={cn(
                     "flex-1",
                     fullWidth ? "p-0" : "px-4 py-6 sm:px-6",
