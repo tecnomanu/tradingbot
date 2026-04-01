@@ -154,10 +154,12 @@ class Bot extends Model
      */
     public function getPnlPercentageAttribute(): float
     {
-        if (!$this->real_investment || $this->real_investment == 0) {
+        // Use full investment (not margin/real_investment) to be consistent
+        // with RiskGuard drawdown calculations.
+        if (!$this->investment || $this->investment == 0) {
             return 0;
         }
-        return round(($this->total_pnl / $this->real_investment) * 100, 2);
+        return round(($this->total_pnl / $this->investment) * 100, 2);
     }
 
     /**
